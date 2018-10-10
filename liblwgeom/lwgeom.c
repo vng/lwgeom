@@ -1647,7 +1647,7 @@ lwgeom_remove_repeated_points_in_place(LWGEOM *geom, double tolerance)
 		}
 		case MULTIPOINTTYPE:
 		{
-			static uint32_t out_stack_size = 32;
+ 			enum out_stack_size { out_stack_size = 32 };
 			double tolsq = tolerance*tolerance;
 			uint32_t i, j, n = 0;
 			LWMPOINT *mpt = (LWMPOINT *)(geom);

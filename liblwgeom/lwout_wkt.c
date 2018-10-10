@@ -85,7 +85,7 @@ static void ptarray_to_wkt_sb(const POINTARRAY *ptarray, stringbuffer_t *sb, int
 	/* OGC only includes X/Y */
 	uint32_t dimensions = 2;
 	uint32_t i, j;
-	static size_t buffer_size = 128;
+	enum buffer_size { buffer_size = 128 };
 	char coord[buffer_size];
 
 	/* ISO and extended formats include all dimensions */

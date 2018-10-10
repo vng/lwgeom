@@ -1568,7 +1568,7 @@ int_cmp(const void *a, const void *b)
 void
 ptarray_simplify_in_place(POINTARRAY *pa, double epsilon, uint32_t minpts)
 {
-	static size_t stack_size = 256;
+	enum stack_size { stack_size = 256 };
 	int *stack, *outlist; /* recursion stack */
 	int stack_static[stack_size];
 	int outlist_static[stack_size];
