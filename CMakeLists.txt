@@ -53,7 +53,9 @@ set( CMAKE_MODULE_PATH
   "${PROJECT_SOURCE_DIR}/CMakeModules" ${CMAKE_MODULE_PATH} )
 
 # Static or shared libs
-set( LWGEOM_USE_STATIC_LIBS OFF CACHE STRING "Whether to use static libs" )
+set( LWGEOM_USE_STATIC_LIBS OFF CACHE BOOL "Whether to use static libs" )
+set( GEOS_DIR CACHE PATH "Location of GEOS installation" )
+set( PROJ_DIR CACHE PATH "Location of PROJ installation" )
 
 # GEOS
 if( LWGEOM_USE_STATIC_LIBS )
@@ -68,9 +70,6 @@ if( LWGEOM_USE_STATIC_LIBS )
 endif()
 find_package( PROJ REQUIRED )
 
-# Liblwgeom
-add_subdirectory( liblwgeom )
-
 # Configure files
 configure_file( ${PROJECT_SOURCE_DIR}/postgis_config.h.in
   ${PROJECT_SOURCE_DIR}/postgis_config.h @ONLY )
@@ -79,3 +78,6 @@ set( SRID_MAX 999999 )
 set( SRID_USR_MAX 998999 )
 configure_file( ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h.in
   ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h @ONLY )
+
+# Liblwgeom
+add_subdirectory( liblwgeom )

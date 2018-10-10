@@ -4,7 +4,6 @@ list( REMOVE_ITEM HEADERS "lwgeom_sfcgal.h" )
 file( GLOB SOURCES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.c" )
 list( REMOVE_ITEM SOURCES "lwgeom_sfcgal.c" )
 
-
 set( TARGET_NAME liblwgeom )
 set( TARGET_VERSION ${${CMAKE_PROJECT_NAME}_VERSION} )
 set( TARGET_EXPORT ${CMAKE_PROJECT_NAME}Targets )
