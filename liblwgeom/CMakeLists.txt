@@ -13,6 +13,7 @@ set( TARGET_LANGUAGE C )
 set( PRIVATE_HEADERS ${HEADERS} )
 set( PUBLIC_HEADERS ${HEADERS} )
 set( PRIVATE_SOURCES ${SOURCES} )
+set( INCDIR_NAME "liblwgeom" )
 
 include_directories( ${GEOS_INCLUDE_DIR} )
 include_directories( ${PROJ_INCLUDE_DIR} )
