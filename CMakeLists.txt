@@ -79,15 +79,3 @@ set( SRID_MAX 999999 )
 set( SRID_USR_MAX 998999 )
 configure_file( ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h.in
   ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h @ONLY )
-
-#set( EXPORT_LIBRARY_TARGETS
-  #lwgeom )
-
-#if( TARGET target )
-  #list( APPEND EXPORT_LIBRARY_TARGETS target )
-#endif()
-
-#set( CONFIGURE_VARS
-  #INSTALL_LIBDIR )
-
-#include( InstallAutoDiscoveryTools )
