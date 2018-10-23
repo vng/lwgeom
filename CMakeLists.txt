@@ -61,14 +61,14 @@ set( PROJ_DIR CACHE PATH "Location of PROJ installation" )
 if( LWGEOM_USE_STATIC_LIBS )
   set( GEOS_USE_STATIC_LIBS ON )
 endif()
-find_package( GEOS REQUIRED )
+find_package( GEOS 3.5 REQUIRED )
 set( POSTGIS_GEOS_VERSION "${GEOS_VERSION_MAJOR}${GEOS_VERSION_MINOR}" )
 
 # PROJ
 if( LWGEOM_USE_STATIC_LIBS )
   set( PROJ_USE_STATIC_LIBS ON )
 endif()
-find_package( PROJ REQUIRED )
+find_package( PROJ 4.9 REQUIRED )
 
 # Configure files
 configure_file( ${PROJECT_SOURCE_DIR}/postgis_config.h.in
@@ -81,3 +81,6 @@ configure_file( ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h.in
 
 # Liblwgeom
 add_subdirectory( liblwgeom )
+install(
+  FILES postgis_config.h postgis_svn_revision.h
+  DESTINATION ${INSTALL_INCDIR} )
