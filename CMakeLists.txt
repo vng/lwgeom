@@ -55,24 +55,47 @@ set( CMAKE_MODULE_PATH
 # GEOS
 set( GEOS_DIR CACHE PATH "Location of GEOS installation" )
 find_package( GEOS 3.5 REQUIRED )
-set( POSTGIS_GEOS_VERSION "${GEOS_VERSION_MAJOR}${GEOS_VERSION_MINOR}" )
+if( GEOS_FOUND )
+  set( POSTGIS_GEOS_VERSION "${GEOS_VERSION_MAJOR}${GEOS_VERSION_MINOR}" )
+  if( GEOS_C_LIB )
+    set( HAVE_LIBGEOS_C 1 )
+  endif()
+endif()
 
 # PROJ
 set( PROJ_DIR CACHE PATH "Location of PROJ installation" )
 find_package( PROJ 4.9 REQUIRED )
+if( PROJ_FOUND )
+  set( HAVE_LIBPROJ 1 )
+endif()
 
 # JSON-C
 set( JSON_C_DIR CACHE PATH "Location of JSON-C installation" )
-find_package( JSONC 0.13 REQUIRED )
+find_package( JSONC 0.13 )
+if( JSON_C_FOUND )
+  set( HAVE_LIBJSON 1 )
+endif()
+
+# Check includes/symbols
+include( CheckIncludeFile )
+include( CheckSymbolExists )
+
+check_include_file( "stdint.h" HAVE_STDINT_H )
+
+if( MSVC )
+  check_symbol_exists( isfinite "corecrt_math.h" HAVE_ISFINITE )
+else()
+  check_symbol_exists( isfinite "math.h" HAVE_ISFINITE )
+endif()
 
 # Configure files
 configure_file( ${PROJECT_SOURCE_DIR}/postgis_config.h.in
   ${PROJECT_SOURCE_DIR}/postgis_config.h @ONLY )
 
-# Liblwgeom
-add_subdirectory( liblwgeom )
-
 # Add postgis headers to install
 install(
   FILES postgis_config.h postgis_svn_revision.h
   DESTINATION ${INSTALL_INCDIR} )
+
+# Liblwgeom
+add_subdirectory( liblwgeom )

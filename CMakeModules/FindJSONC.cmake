@@ -5,25 +5,23 @@
 #
 # This module defines:
 #
-# JSON_C_INCLUDE_DIR, where to find json.h, etc.
+# JSON_C_INCLUDE_DIR, where to find json-c/json.h, etc.
 # JSON_C_LIBRARY, libraries to link against to use JSON-C.
 # JSON_C_FOUND, true if found, false if one of the above are not found.
 
 # Find include path
 find_path( JSON_C_INCLUDE_DIR
   NAMES
-    json.h
+    json-c/json.h
   HINTS
     ${JSON_C_DIR}/include
   PATHS
     /usr/include
-    /usr/local/include
-  PATH_SUFFIXES
-    json-c )
+    /usr/local/include )
 
   # Set JSON_C_VERSION
 if( JSON_C_INCLUDE_DIR )
-  set( _versionFile "${JSON_C_INCLUDE_DIR}/json_c_version.h" )
+  set( _versionFile "${JSON_C_INCLUDE_DIR}/json-c/json_c_version.h" )
   if( NOT EXISTS ${_versionFile} )
     message( SEND_ERROR "Can't find ${_versionFile}" )
   else()

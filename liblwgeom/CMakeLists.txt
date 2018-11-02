@@ -1,19 +1,4 @@
 
-include( CheckSymbolExists )
-
-if( MSVC )
-  check_symbol_exists( isfinite "corecrt_math.h" HAVE_ISFINITE )
-else()
-  check_symbol_exists( isfinite "math.h" HAVE_ISFINITE )
-endif()
-if( HAVE_ISFINITE )
-  add_definitions( -DHAVE_ISFINITE )
-endif()
-
-if( JSON_C_FOUND )
-  add_definitions( -DHAVE_LIBJSON_C )
-endif()
-
 set( SRID_MAX 999999 )
 set( SRID_USR_MAX 998999 )
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/liblwgeom.h.in
@@ -48,8 +33,8 @@ add_library( ${TARGET_NAME}
   ${PRIVATE_HEADERS} )
 target_include_directories( ${TARGET_NAME} PUBLIC
   ${GEOS_INCLUDE_DIR}
-  ${PROJ_INCLUDE_DIR} )
-  #"$<$<BOOL:${JSON_C_FOUND}>:${JSON_C_INCLUDE_DIR}>" )
+  ${PROJ_INCLUDE_DIR}
+  "$<$<BOOL:${JSON_C_FOUND}>:${JSON_C_INCLUDE_DIR}>" )
 target_link_libraries( ${TARGET_NAME}
   ${GEOS_LIBRARY}
   ${PROJ_LIBRARY}
