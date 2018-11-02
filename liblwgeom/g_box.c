@@ -31,7 +31,7 @@
 #ifndef HAVE_ISFINITE
 # ifdef HAVE_GNU_ISFINITE
 #  define _GNU_SOURCE
-# elif _WIN32
+# elif defined _WIN32 || defined _WIN64
 #  define isfinite _finite
 # else
 #  define isfinite finite

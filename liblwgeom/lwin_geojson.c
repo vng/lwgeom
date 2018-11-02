@@ -52,6 +52,10 @@
 
 #include <string.h>
 
+#if defined _WIN32 || defined _WIN64
+#define strcasecmp _stricmp
+#endif
+
 static void geojson_lwerror(char *msg, __attribute__((__unused__)) int error_code)
 {
 	LWDEBUGF(3, "lwgeom_from_geojson ERROR %i", error_code);
