@@ -52,35 +52,27 @@ endif()
 set( CMAKE_MODULE_PATH
   "${PROJECT_SOURCE_DIR}/CMakeModules" ${CMAKE_MODULE_PATH} )
 
-# Static or shared libs
-set( LWGEOM_USE_STATIC_LIBS OFF CACHE BOOL "Whether to use static libs" )
-set( GEOS_DIR CACHE PATH "Location of GEOS installation" )
-set( PROJ_DIR CACHE PATH "Location of PROJ installation" )
-
 # GEOS
-if( LWGEOM_USE_STATIC_LIBS )
-  set( GEOS_USE_STATIC_LIBS ON )
-endif()
+set( GEOS_DIR CACHE PATH "Location of GEOS installation" )
 find_package( GEOS 3.5 REQUIRED )
 set( POSTGIS_GEOS_VERSION "${GEOS_VERSION_MAJOR}${GEOS_VERSION_MINOR}" )
 
 # PROJ
-if( LWGEOM_USE_STATIC_LIBS )
-  set( PROJ_USE_STATIC_LIBS ON )
-endif()
+set( PROJ_DIR CACHE PATH "Location of PROJ installation" )
 find_package( PROJ 4.9 REQUIRED )
+
+# JSON-C
+set( JSON_C_DIR CACHE PATH "Location of JSON-C installation" )
+find_package( JSONC 0.13 REQUIRED )
 
 # Configure files
 configure_file( ${PROJECT_SOURCE_DIR}/postgis_config.h.in
   ${PROJECT_SOURCE_DIR}/postgis_config.h @ONLY )
 
-set( SRID_MAX 999999 )
-set( SRID_USR_MAX 998999 )
-configure_file( ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h.in
-  ${PROJECT_SOURCE_DIR}/liblwgeom/liblwgeom.h @ONLY )
-
 # Liblwgeom
 add_subdirectory( liblwgeom )
+
+# Add postgis headers to install
 install(
   FILES postgis_config.h postgis_svn_revision.h
   DESTINATION ${INSTALL_INCDIR} )

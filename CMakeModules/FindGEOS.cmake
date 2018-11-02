@@ -34,10 +34,10 @@ if( GEOS_INCLUDE_DIR )
     set( GEOS_VERSION_MINOR ${CMAKE_MATCH_1} )
 
     string( REGEX MATCH "GEOS_VERSION_PATCH ([0-9]*)" _ ${_versionContents} )
-    set( GEOS_VERSION_PATCH ${CMAKE_MATCH_1} )
+    set( GEOS_VERSION_MICRO ${CMAKE_MATCH_1} )
 
     set( GEOS_VERSION
-      "${GEOS_VERSION_MAJOR}.${GEOS_VERSION_MINOR}.${GEOS_VERSION_PATCH}" )
+      "${GEOS_VERSION_MAJOR}.${GEOS_VERSION_MINOR}.${GEOS_VERSION_MICRO}" )
   endif()
 endif()
 
@@ -93,7 +93,9 @@ endif()
 # Set GEOS_FOUND if variables are valid
 include( FindPackageHandleStandardArgs )
 find_package_handle_standard_args( GEOS
-  DEFAULT_MSG GEOS_LIBRARY GEOS_INCLUDE_DIR )
+  FOUND_VAR GEOS_FOUND
+  REQUIRED_VARS GEOS_LIBRARY GEOS_INCLUDE_DIR
+  VERSION_VAR GEOS_VERSION )
 
 if( GEOS_FOUND )
   if( NOT GEOS_FIND_QUIETLY )

@@ -1,4 +1,24 @@
 
+include( CheckSymbolExists )
+
+if( MSVC )
+  check_symbol_exists( isfinite "corecrt_math.h" HAVE_ISFINITE )
+else()
+  check_symbol_exists( isfinite "math.h" HAVE_ISFINITE )
+endif()
+if( HAVE_ISFINITE )
+  add_definitions( -DHAVE_ISFINITE )
+endif()
+
+if( JSON_C_FOUND )
+  add_definitions( -DHAVE_LIBJSON_C )
+endif()
+
+set( SRID_MAX 999999 )
+set( SRID_USR_MAX 998999 )
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/liblwgeom.h.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/liblwgeom.h @ONLY )
+
 file( GLOB HEADERS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.h" )
 list( REMOVE_ITEM HEADERS "lwgeom_sfcgal.h" )
 file( GLOB SOURCES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.c" )
@@ -14,21 +34,25 @@ set( PUBLIC_HEADERS ${HEADERS} )
 set( PRIVATE_SOURCES ${SOURCES} )
 set( INCDIR_NAME "liblwgeom" )
 
-include_directories( ${GEOS_INCLUDE_DIR} )
-include_directories( ${PROJ_INCLUDE_DIR} )
-
-if( WIN32 )
+if( MSVC )
   add_definitions( -D_CRT_SECURE_NO_DEPRECATE )
   add_definitions( -D_USE_MATH_DEFINES )
+
+  if( BUILD_SHARED_LIBS )
+    set( CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON )
+  endif()
 endif()
 
-if( LWGEOM_USE_STATIC_LIBS )
-  add_library( ${TARGET_NAME} STATIC ${PRIVATE_SOURCES} ${PRIVATE_HEADERS} )
-else()
-  add_library( ${TARGET_NAME} ${PRIVATE_SOURCES} ${PRIVATE_HEADERS} )
-endif()
+add_library( ${TARGET_NAME}
+  ${PRIVATE_SOURCES}
+  ${PRIVATE_HEADERS} )
+target_include_directories( ${TARGET_NAME} PUBLIC
+  ${GEOS_INCLUDE_DIR}
+  ${PROJ_INCLUDE_DIR} )
+  #"$<$<BOOL:${JSON_C_FOUND}>:${JSON_C_INCLUDE_DIR}>" )
 target_link_libraries( ${TARGET_NAME}
   ${GEOS_LIBRARY}
-  ${PROJ_LIBRARY} )
+  ${PROJ_LIBRARY}
+  "$<$<BOOL:${JSON_C_FOUND}>:${JSON_C_LIBRARY}>" )
 
 include( ModuleInstall )
