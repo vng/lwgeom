@@ -8,7 +8,10 @@ The CMake build is a work in progress and support for additional dependencies wi
 ```
 mkdir <build-dir>
 cd <build-dir>
-cmake .. -DCMAKE_INSTALL_PREFIX=<install-dir>
+cmake .. -DCMAKE_INSTALL_PREFIX=<install-dir> -DCMAKE_INSTALL_PREFIX=<install-dir> \
+-DBUILD_SHARED_LIBS=OFF -DGEOS_DIR=<geos-install-dir> -DGEOS_USE_STATIC_LIBS=ON \
+-DPROJ_DIR=<proj-install-dir> -DPROJ_USE_STATIC_LIBS=ON \
+-DJSON_C_DIR=<jsonc-install-dir> -DJSON_C_USE_STATIC_LIBS=ON
 make
 make install
 ```
