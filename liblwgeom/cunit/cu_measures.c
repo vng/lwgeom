@@ -19,6 +19,7 @@
 #include "liblwgeom_internal.h"
 #include "cu_tester.h"
 #include "measures.h"
+#include "measures3d.h"
 #include "lwtree.h"
 
 static LWGEOM* lwgeom_from_text(const char *str)
@@ -29,9 +30,18 @@ static LWGEOM* lwgeom_from_text(const char *str)
 	return r.geom;
 }
 
-#define DIST2DTEST(str1, str2, res) do_test_mindistance2d_tolerance(str1, str2, res, __LINE__)
+#define DIST2DTEST(str1, str2, res) \
+	do_test_mindistance_tolerance(str1, str2, res, __LINE__, lwgeom_mindistance2d_tolerance);\
+	do_test_mindistance_tolerance(str2, str1, res, __LINE__, lwgeom_mindistance2d_tolerance)
+#define DIST3DTEST(str1, str2, res) \
+	do_test_mindistance_tolerance(str1, str2, res, __LINE__, lwgeom_mindistance3d_tolerance)
 
-static void do_test_mindistance2d_tolerance(char *in1, char *in2, double expected_res, int line)
+static void
+do_test_mindistance_tolerance(char *in1,
+			      char *in2,
+			      double expected_res,
+			      int line,
+			      double (*distancef)(const LWGEOM *, const LWGEOM *, double))
 {
 	LWGEOM *lw1;
 	LWGEOM *lw2;
@@ -53,7 +63,7 @@ static void do_test_mindistance2d_tolerance(char *in1, char *in2, double expecte
 		exit(1);
 	}
 
-	distance = lwgeom_mindistance2d_tolerance(lw1, lw2, 0.0);
+	distance = distancef(lw1, lw2, 0.0);
 	lwgeom_free(lw1);
 	lwgeom_free(lw2);
 
@@ -191,6 +201,42 @@ static void test_mindistance2d_tolerance(void)
 	*/
 	DIST2DTEST("LINESTRING(0.5 1,0.5 3)", "MULTICURVE(CIRCULARSTRING(2 3,3 2,2 1,1 2,2 3),(0 0, 0 5))", 0.5);
 
+}
+
+static void
+test_mindistance3d_tolerance(void)
+{
+	/* 2D [Z=0] should work just the same */
+	DIST3DTEST("POINT(0 0 0)", "MULTIPOINT(0 1.5 0, 0 2 0, 0 2.5 0)", 1.5);
+	DIST3DTEST("POINT(0 0 0)", "MULTIPOINT(0 1.5 0, 0 2 0, 0 2.5 0)", 1.5);
+	DIST3DTEST("POINT(0 0 0)", "GEOMETRYCOLLECTION(POINT(3 4 0))", 5.0);
+	DIST3DTEST("POINT(0 0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0)))", 5.0);
+	DIST3DTEST("POINT(0 0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0))))", 5.0);
+	DIST3DTEST("POINT(0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4))))", 5.0);
+	DIST3DTEST("GEOMETRYCOLLECTION(POINT(0 0 0))", "GEOMETRYCOLLECTION(POINT(3 4 0))", 5.0);
+	DIST3DTEST("GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(0 0 0)))",
+		   "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0)))",
+		   5.0);
+	DIST3DTEST("GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(0 0 0)))",
+		   "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4 0)))",
+		   5.0);
+	DIST3DTEST("LINESTRING(-2 0 0, -0.2 0 0)", "POINT(-2 0 0)", 0);
+	DIST3DTEST("LINESTRING(-0.2 0 0, -2 0 0)", "POINT(-2 0 0)", 0);
+	DIST3DTEST("LINESTRING(-1e-8 0 0, -0.2 0 0)", "POINT(-1e-8 0 0)", 0);
+	DIST3DTEST("LINESTRING(-0.2 0 0, -1e-8 0 0)", "POINT(-1e-8 0 0)", 0);
+
+	/* Tests around intersections */
+	DIST3DTEST("LINESTRING(1 0 0 , 2 0 0)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 1.0);
+	DIST3DTEST("LINESTRING(1 1 1 , 2 1 0)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 0.0);
+	DIST3DTEST("LINESTRING(1 1 1 , 2 1 1)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 1.0);
+	/* Line in polygon */
+	DIST3DTEST("LINESTRING(1 1 1 , 2 2 2)", "POLYGON((0 0 0, 2 2 2, 3 3 1, 0 0 0))", 0.0);
+
+	/* Line has a point in the same plane as the polygon but isn't the closest*/
+	DIST3DTEST("LINESTRING(-10000 -10000 0, 0 0 1)", "POLYGON((0 0 0, 1 0 0, 1 1 0, 0 1 0, 0 0 0))", 1);
+
+	/* This is an invalid polygon since it defines just a line */
+	DIST3DTEST("LINESTRING(1 1 1 , 2 2 2)", "POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", 0);
 }
 
 static int tree_pt(RECT_NODE *tree, double x, double y)
@@ -749,6 +795,18 @@ test_lw_dist2d_arc_arc(void)
 	POINT2D A1, A2, A3, B1, B2, B3;
 	int rv;
 
+	/* Ticket #4326 */
+	lw_dist2d_distpts_init(&dl, DIST_MIN);
+	A1.x = -1.0; A1.y =  4.0;
+	A2.x =  0.0; A2.y =  5.0;
+	A3.x =  1.0; A3.y =  4.0;
+	B1.x =  1.0; B1.y =  6.0;
+	B2.x =  6.0; B2.y =  1.0;
+	B3.x =  9.0; B3.y =  7.0;
+	rv = lw_dist2d_arc_arc(&A1, &A2, &A3, &B1, &B2, &B3, &dl);
+	CU_ASSERT_EQUAL( rv, LW_SUCCESS );
+	CU_ASSERT_DOUBLE_EQUAL(dl.distance, 0.0475666, 0.000001);
+
 	/* Unit semicircle at 0,0 */
 	B1.x = -1; B1.y = 0;
 	B2.x = 0 ; B2.y = 1;
@@ -912,7 +970,6 @@ test_lw_dist2d_arc_arc(void)
 	rv = lw_dist2d_arc_arc(&A1, &A2, &A3, &B1, &B2, &B3, &dl);
 	CU_ASSERT_EQUAL( rv, LW_SUCCESS );
 	CU_ASSERT_DOUBLE_EQUAL(dl.distance, 5.0, 0.000001);
-
 
 }
 
@@ -1387,6 +1444,7 @@ void measures_suite_setup(void)
 {
 	CU_pSuite suite = CU_add_suite("measures", NULL, NULL);
 	PG_ADD_TEST(suite, test_mindistance2d_tolerance);
+	PG_ADD_TEST(suite, test_mindistance3d_tolerance);
 	PG_ADD_TEST(suite, test_rect_tree_contains_point);
 	PG_ADD_TEST(suite, test_rect_tree_intersects_tree);
 	PG_ADD_TEST(suite, test_lwgeom_segmentize2d);

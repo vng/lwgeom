@@ -14,9 +14,6 @@
    language is requested. */
 #cmakedefine01 ENABLE_NLS
 
-/* Define to 1 if GDALFPolygonize function is available */
-#cmakedefine01 GDALFPOLYGONIZE
-
 /* Define to 1 if you have the MacOS X function CFLocaleCopyCurrent in the
    CoreFoundation framework. */
 #cmakedefine01 HAVE_CFLOCALECOPYCURRENT
@@ -63,6 +60,9 @@
 
 /* Define to 1 if libprotobuf-c is present */
 #cmakedefine01 HAVE_LIBPROTOBUF
+
+/* Define to 1 if libprotobuf-c is >= version 1.1 */
+#cmakedefine01 HAVE_GEOBUF
 
 /* Define to 1 if libjson is present */
 #cmakedefine01 HAVE_LIBJSON

@@ -1606,6 +1606,7 @@ lwgeom_remove_repeated_points_in_place(LWGEOM *geom, double tolerance)
 	{
 		/* No-op! Cannot remote points */
 		case POINTTYPE:
+		case TRIANGLETYPE:
 			return;
 		case LINETYPE:
 		{
@@ -1705,6 +1706,7 @@ lwgeom_remove_repeated_points_in_place(LWGEOM *geom, double tolerance)
 		/* Can process most multi* types as generic collection */
 		case MULTILINETYPE:
 		case MULTIPOLYGONTYPE:
+		case TINTYPE:
 		case COLLECTIONTYPE:
 		/* Curve types we mostly ignore, but allow the linear */
 		/* portions to be processed by recursing into them */
@@ -1749,8 +1751,9 @@ lwgeom_simplify_in_place(LWGEOM *geom, double epsilon, int preserve_collapsed)
 {
 	switch (geom->type)
 	{
-		/* No-op! Cannot simplify points */
+		/* No-op! Cannot simplify points or triangles */
 		case POINTTYPE:
+		case TRIANGLETYPE:
 			return;
 		case LINETYPE:
 		{
@@ -1809,6 +1812,7 @@ lwgeom_simplify_in_place(LWGEOM *geom, double epsilon, int preserve_collapsed)
 		case MULTIPOINTTYPE:
 		case MULTILINETYPE:
 		case MULTIPOLYGONTYPE:
+		case TINTYPE:
 		case COLLECTIONTYPE:
 		{
 			uint32_t i, j = 0;
@@ -2154,6 +2158,7 @@ lwgeom_grid_in_place(LWGEOM *geom, const gridspec *grid)
 			return;
 		}
 		case CIRCSTRINGTYPE:
+		case TRIANGLETYPE:
 		case LINETYPE:
 		{
 			LWLINE *ln = (LWLINE*)(geom);
@@ -2207,6 +2212,7 @@ lwgeom_grid_in_place(LWGEOM *geom, const gridspec *grid)
 		case MULTIPOINTTYPE:
 		case MULTILINETYPE:
 		case MULTIPOLYGONTYPE:
+		case TINTYPE:
 		case COLLECTIONTYPE:
 		case COMPOUNDTYPE:
 		{
@@ -2265,8 +2271,11 @@ lwgeom_subdivide_recursive(const LWGEOM *geom, uint8_t dimension, uint32_t maxve
 	double center = DBL_MAX;
 	LWPOLY *lwpoly = NULL;
 	LWGEOM *clipped;
-
-	gbox_duplicate(lwgeom_get_bbox(geom), &clip);
+	const GBOX *box_in;
+	if (!geom) return 0;
+	box_in = lwgeom_get_bbox(geom);
+	if (!box_in) return 0;
+	gbox_duplicate(box_in, &clip);
 	width = clip.xmax - clip.xmin;
 	height = clip.ymax - clip.ymin;
 
@@ -2353,7 +2362,7 @@ lwgeom_subdivide_recursive(const LWGEOM *geom, uint8_t dimension, uint32_t maxve
 		lwpoly = (LWPOLY *)geom;
 
 		/* if there are more points in holes than in outer ring */
-		if (nvertices > 2 * lwpoly->rings[0]->npoints)
+		if (nvertices >= 2 * lwpoly->rings[0]->npoints)
 		{
 			/* trim holes starting from biggest */
 			for (i = 1; i < lwpoly->nrings; i++)
@@ -2392,9 +2401,19 @@ lwgeom_subdivide_recursive(const LWGEOM *geom, uint8_t dimension, uint32_t maxve
 	if (pivot == DBL_MAX) pivot = center;
 
 	if (split_ordinate == 0)
-		subbox1.xmax = subbox2.xmin = pivot;
+	{
+		if (FP_NEQUALS(subbox1.xmax, pivot) && FP_NEQUALS(subbox1.xmin, pivot))
+			subbox1.xmax = subbox2.xmin = pivot;
+		else
+			subbox1.xmax = subbox2.xmin = center;
+	}
 	else
-		subbox1.ymax = subbox2.ymin = pivot;
+	{
+		if (FP_NEQUALS(subbox1.ymax, pivot) && FP_NEQUALS(subbox1.ymin, pivot))
+			subbox1.ymax = subbox2.ymin = pivot;
+		else
+			subbox1.ymax = subbox2.ymin = center;
+	}
 
 	++depth;
 
@@ -2402,7 +2421,7 @@ lwgeom_subdivide_recursive(const LWGEOM *geom, uint8_t dimension, uint32_t maxve
 	clipped = lwgeom_intersection(geom, subbox);
 	lwgeom_simplify_in_place(clipped, 0.0, LW_TRUE);
 	lwgeom_free(subbox);
-	if (clipped)
+	if (clipped && !lwgeom_is_empty(clipped))
 	{
 		n += lwgeom_subdivide_recursive(clipped, dimension, maxvertices, depth, col);
 		lwgeom_free(clipped);
@@ -2412,7 +2431,7 @@ lwgeom_subdivide_recursive(const LWGEOM *geom, uint8_t dimension, uint32_t maxve
 	clipped = lwgeom_intersection(geom, subbox);
 	lwgeom_simplify_in_place(clipped, 0.0, LW_TRUE);
 	lwgeom_free(subbox);
-	if (clipped)
+	if (clipped && !lwgeom_is_empty(clipped))
 	{
 		n += lwgeom_subdivide_recursive(clipped, dimension, maxvertices, depth, col);
 		lwgeom_free(clipped);
