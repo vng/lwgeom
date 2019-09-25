@@ -1,6 +1,6 @@
 
 cmake_minimum_required( VERSION 3.0.0 )
-project( lwgeom )
+project( LWGEOM )
 
 # Get version info
 set( _versionFile "${CMAKE_CURRENT_SOURCE_DIR}/Version.config" )
