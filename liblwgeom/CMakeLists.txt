@@ -31,6 +31,9 @@ endif()
 add_library( ${TARGET_NAME}
   ${PRIVATE_SOURCES}
   ${PRIVATE_HEADERS} )
+if( NOT BUILD_SHARED_LIBS )
+  set_property( TARGET ${TARGET_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON )
+endif()
 target_include_directories( ${TARGET_NAME} PUBLIC
   ${GEOS_INCLUDE_DIR}
   ${PROJ_INCLUDE_DIR}
