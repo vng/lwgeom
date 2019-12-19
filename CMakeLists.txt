@@ -71,7 +71,7 @@ endif()
 
 # JSON-C
 set( JSON_C_DIR CACHE PATH "Location of JSON-C installation" )
-find_package( JSONC 0.13 )
+find_package( JSONC 0.11 )
 if( JSON_C_FOUND )
   set( HAVE_LIBJSON 1 )
 endif()
