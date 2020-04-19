@@ -1,7 +1,7 @@
 #ifndef POSTGIS_CONFIG_H
 #define POSTGIS_CONFIG_H 1
 
-#include "postgis_svn_revision.h"
+#include "postgis_revision.h"
 
 /* Manually manipulate the POSTGIS_DEBUG_LEVEL, it is not affected by the
    configure process */
@@ -14,34 +14,14 @@
    language is requested. */
 #cmakedefine01 ENABLE_NLS
 
-/* Define to 1 if GDALFPolygonize function is available */
-#cmakedefine01 GDALFPOLYGONIZE
-
-/* Define to 1 if you have the MacOS X function CFLocaleCopyCurrent in the
-   CoreFoundation framework. */
-#cmakedefine01 HAVE_CFLOCALECOPYCURRENT
-
-/* Define to 1 if you have the MacOS X function CFPreferencesCopyAppValue in
-   the CoreFoundation framework. */
-#cmakedefine01 HAVE_CFPREFERENCESCOPYAPPVALUE
-
-/* Define if the GNU dcgettext() function is already present or preinstalled.
-   */
-#cmakedefine HAVE_DCGETTEXT
-
 /* Define for some functions we are interested in */
-#cmakedefine HAVE_VASPRINTF
-#cmakedefine HAVE_ASPRINTF
-#cmakedefine HAVE_ISFINITE
-#cmakedefine HAVE_GNU_ISFINITE
 #cmakedefine HAVE_FSEEKO
-#cmakedefine HAVE_STRCASESTR
-
-/* Define to 1 if you have the <dlfcn.h> header file. */
-#cmakedefine01 HAVE_DLFCN_H
 
 /* Define if the GNU gettext() function is already present or preinstalled. */
 #cmakedefine HAVE_GETTEXT
+
+/* Define if the build is big endian */
+#cmakedefine WORDS_BIGENDIAN
 
 /* Define if you have the iconv() function and it works. */
 #cmakedefine HAVE_ICONV
@@ -49,11 +29,8 @@
 /* Define to 1 if you have the `iconvctl' function. */
 #cmakedefine01 HAVE_ICONVCTL
 
-/* ieeefp.h header */
-#cmakedefine HAVE_IEEEFP_H
-
-/* Define to 1 if you have the <inttypes.h> header file. */
-#cmakedefine01 HAVE_INTTYPES_H
+/* Define to 1 if you have the ieeefp.h header */
+#cmakedefine01 HAVE_IEEEFP_H
 
 /* Define to 1 if you have the `geos_c' library (-lgeos_c). */
 #cmakedefine01 HAVE_LIBGEOS_C
@@ -64,11 +41,14 @@
 /* Define to 1 if libprotobuf-c is present */
 #cmakedefine01 HAVE_LIBPROTOBUF
 
+/* Define to 1 if protobuf_c_version() is present */
+#cmakedefine01 HAVE_PROTOBUF_C_VERSION
+
+/* Define to 1 if libprotobuf-c is >= version 1.1 */
+#cmakedefine01 HAVE_GEOBUF
+
 /* Define to 1 if libjson is present */
 #cmakedefine01 HAVE_LIBJSON
-
-/* Define to 1 if libjson resides in json-c subdir */
-#cmakedefine01 HAVE_LIBJSON_C
 
 /* Define to 1 if you have the `pq' library (-lpq). */
 #cmakedefine01 HAVE_LIBPQ
@@ -91,39 +71,14 @@
 /* Define to 1 if you have the <libxml/xpath.h> header file. */
 #cmakedefine01 HAVE_LIBXML_XPATH_H
 
-/* Define to 1 if you have the <memory.h> header file. */
-#cmakedefine01 HAVE_MEMORY_H
-
-/* Define to 1 if you have the <stdint.h> header file. */
-#cmakedefine01 HAVE_STDINT_H
-
-/* Define to 1 if you have the <stdlib.h> header file. */
-#cmakedefine01 HAVE_STDLIB_H
-
-/* Define to 1 if you have the <strings.h> header file. */
-#cmakedefine01 HAVE_STRINGS_H
-
-/* Define to 1 if you have the <string.h> header file. */
-#cmakedefine01 HAVE_STRING_H
-
-/* Define to 1 if you have the <sys/stat.h> header file. */
-#cmakedefine01 HAVE_SYS_STAT_H
-
-/* Define to 1 if you have the <sys/types.h> header file. */
-#cmakedefine01 HAVE_SYS_TYPES_H
-
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine01 HAVE_UNISTD_H
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
-#cmakedefine LT_OBJDIR "@LT_OBJDIR@"
+/* Define to 1 if wagyu is being built */
+#cmakedefine01 HAVE_WAGYU
 
-/* Location of PostgreSQL locale directory */
-#cmakedefine PGSQL_LOCALEDIR "@PGSQL_LOCALEDIR@"
-
-/* Enable caching of bounding box within geometries */
-#cmakedefine POSTGIS_AUTOCACHE_BBOX
+/* Define to 1 if sfcgal is being built */
+#cmakedefine01 HAVE_SFCGAL
 
 /* PostGIS build date */
 #cmakedefine POSTGIS_BUILD_DATE "@POSTGIS_BUILD_DATE@"
@@ -158,41 +113,15 @@
 /* PROJ library version */
 #define POSTGIS_PROJ_VERSION @POSTGIS_PROJ_VERSION@
 
-/* PostGIS Raster build date */
-#cmakedefine POSTGIS_RASTER_BUILD_DATE "@POSTGIS_RASTER_BUILD_DATE@"
-
-/* PostGIS Raster library version */
-#define POSTGIS_RASTER_LIB_VERSION @POSTGIS_RASTER_LIB_VERSION@
-
-/* PostGIS Raster major version */
-#define POSTGIS_RASTER_MAJOR_VERSION @POSTGIS_RASTER_MAJOR_VERSION@
-
-/* PostGIS Raster micro version */
-#define POSTGIS_RASTER_MICRO_VERSION @POSTGIS_RASTER_MICRO_VERSION@
-
-/* PostGIS Raster minor version */
-#define POSTGIS_RASTER_MINOR_VERSION @POSTGIS_RASTER_MINOR_VERSION@
-
-/* PostGIS Raster scripts version */
-#define POSTGIS_RASTER_SCRIPTS_VERSION @POSTGIS_RASTER_SCRIPTS_VERSION@
-
-/* PostGIS Raster version */
-#define POSTGIS_RASTER_VERSION @POSTGIS_RASTER_VERSION@
-
 /* Define to 1 if a warning is outputted every time a double is truncated */
 #cmakedefine01 POSTGIS_RASTER_WARN_ON_TRUNCATION
 
 /* PostGIS scripts version */
 #define POSTGIS_SCRIPTS_VERSION @POSTGIS_SCRIPTS_VERSION@
 
-/* Enable use of ANALYZE statistics */
-#cmakedefine POSTGIS_USE_STATS
 
 /* PostGIS version */
 #define POSTGIS_VERSION @POSTGIS_VERSION@
-
-/* Define command to determine the current directory during regression */
-#cmakedefine PWDREGRESS "@PWDREGRESS@"
 
 /* Define to 1 if you have the ANSI C header files. */
 #cmakedefine01 STDC_HEADERS

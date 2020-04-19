@@ -94,7 +94,7 @@ configure_file( ${PROJECT_SOURCE_DIR}/postgis_config.h.in
 
 # Add postgis headers to install
 install(
-  FILES postgis_config.h postgis_svn_revision.h
+  FILES postgis_config.h postgis_revision.h
   DESTINATION ${INSTALL_INCDIR} )
 
 # Liblwgeom
