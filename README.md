@@ -4,6 +4,14 @@ Standalone liblwgeom CMake build with preliminary support for MSVC compiler
 # Build
 The CMake build is a work in progress and support for additional dependencies will be added if time permits.
 
+## Preferred
+```
+cmake -DBUILD_SHARED_LIBS=OFF \
+      -DGEOS_DIR=<geos-install-dir> -DGEOS_USE_STATIC_LIBS=ON \
+      -DPROJ_DIR=<proj-install-dir> -DPROJ_USE_STATIC_LIBS=ON \
+      -DPOSTGIS_PROJ_VERSION=71 ..
+```
+
 ## Linux
 ```
 mkdir <build-dir>
