@@ -23,10 +23,10 @@
 # **********************************************************************/
 
 CC = @CC@
-CPPFLAGS = @CPPFLAGS@
-CFLAGS = @CFLAGS@ @PICFLAGS@ @WARNFLAGS@ @GEOS_CPPFLAGS@ @PROJ_CPPFLAGS@ @JSON_CPPFLAGS@
-LDFLAGS = @LDFLAGS@ @GEOS_LDFLAGS@ -lgeos_c @PROJ_LDFLAGS@ -lproj @JSON_LDFLAGS@ -lm
-NUMERICFLAGS = @NUMERICFLAGS@
+RYU_INCLUDE = -I../deps/ryu/..
+CPPFLAGS =  $(RYU_INCLUDE) @CPPFLAGS@
+CFLAGS = @CFLAGS@ @PICFLAGS@
+LDFLAGS = @LDFLAGS@ @GEOS_LDFLAGS@ @PROJ_LDFLAGS@ @JSON_LDFLAGS@
 top_builddir = @top_builddir@
 prefix = @prefix@
 exec_prefix = @exec_prefix@
@@ -55,6 +55,7 @@ SA_OBJS = \
 	measures.o \
 	measures3d.o \
 	ptarray.o \
+	lookup3.o \
 	lwgeom_api.o \
 	lwgeom.o \
 	lwpoint.o \
@@ -91,11 +92,13 @@ SA_OBJS = \
 	lwstroke.o \
 	lwlinearreferencing.o \
 	lwprint.o \
-	g_box.o \
-	g_serialized.o \
-	g_util.o \
+	gbox.o \
+	gserialized.o \
+	gserialized1.o \
+	gserialized2.o \
 	lwgeodetic.o \
 	lwgeodetic_tree.o \
+	lwrandom.o \
 	lwtree.o \
 	lwout_gml.o \
 	lwout_kml.o \
@@ -147,9 +150,11 @@ SA_HEADERS = \
 	lwgeom_geos.h \
 	lwgeom_log.h \
 	lwgeom_sfcgal.h \
+	lwinline.h \
 	lwin_wkt.h \
 	lwin_wkt_parse.h \
 	lwout_twkb.h \
+	lwrandom.h \
 	lwtree.h \
 	measures3d.h \
 	measures.h \
@@ -158,31 +163,24 @@ SA_HEADERS = \
 
 all: liblwgeom.la
 
-install: install-liblwgeom
+install:
 
-uninstall: uninstall-liblwgeom
+uninstall:
 
-install-liblwgeom: liblwgeom.la
-	$(INSTALL) -d "$(DESTDIR)$(libdir)"
-	$(LIBTOOL) --mode=install $(INSTALL) liblwgeom.la "$(DESTDIR)$(libdir)/liblwgeom.la"
-	$(INSTALL) -d "$(DESTDIR)$(includedir)"
-	$(INSTALL) -m 0644 liblwgeom.h "$(DESTDIR)$(includedir)/liblwgeom.h"
-	$(INSTALL) -m 0644 liblwgeom_topo.h "$(DESTDIR)$(includedir)/liblwgeom_topo.h"
+# Make all objects depend upon postgis_config.h and postgis_revision.h
+$(LT_OBJS): ../postgis_config.h ../postgis_revision.h $(SA_HEADERS)
 
-uninstall-liblwgeom:
-	$(LIBTOOL) --mode=uninstall rm -f "$(DESTDIR)$(libdir)/liblwgeom.la"
-	$(LIBTOOL) --mode=uninstall rm -f "$(DESTDIR)$(includedir)/liblwgeom.h"
-	$(LIBTOOL) --mode=uninstall rm -f "$(DESTDIR)$(includedir)/liblwgeom_topo.h"
+../postgis_revision.h:
+	$(MAKE) -C .. postgis_revision.h
 
-# Make all objects depend upon postgis_config.h and postgis_svn_revision.h
-$(LT_OBJS): ../postgis_config.h ../postgis_svn_revision.h $(SA_HEADERS)
 
-../postgis_svn_revision.h:
-	$(MAKE) -C .. postgis_svn_revision.h
+RYU_LIBPATH = ../deps/ryu/@RYU_LIB@
+$(RYU_LIBPATH):
+	$(MAKE) -C ../deps/ryu @RYU_LIB@
 
-liblwgeom.la: $(LT_OBJS)
-	$(LIBTOOL) --tag=CC --mode=link $(CC) -rpath $(libdir) $(LT_OBJS) \
-             -release $(SOVER) -version-info $(VERSION_INFO) $(LDFLAGS) -o $@
+liblwgeom.la: $(LT_OBJS) $(RYU_LIBPATH)
+	$(LIBTOOL) --tag=CC --mode=link $(CC) -rpath $(libdir) $(LT_OBJS) $(RYU_LIBPATH)\
+             -release $(SOVER) -version-info $(VERSION_INFO) $(LDFLAGS) -static -o $@
 
 maintainer-clean: clean
 	rm -f lwin_wkt_lex.c
@@ -191,6 +189,7 @@ maintainer-clean: clean
 
 clean:
 	$(MAKE) -C cunit clean
+	$(MAKE) -C ../deps/ryu clean
 	rm -f $(LT_OBJS) $(SA_OBJS) $(NM_OBJS)
 	rm -f liblwgeom.la
 	rm -rf .libs
@@ -198,9 +197,12 @@ clean:
 distclean: clean
 	$(MAKE) -C cunit distclean
 	rm -f liblwgeom.h Makefile
-	rm -f Makefile
 
-check: liblwgeom.la
+check: check-unit
+
+check-regress:
+
+check-unit: liblwgeom.la
 	$(MAKE) -C cunit check
 
 # Command to build each of the .lo files
@@ -208,12 +210,20 @@ $(LT_SA_OBJS): %.lo: %.c
 	$(LIBTOOL) --mode=compile $(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 $(LT_NM_OBJS): %.lo: %.c
-	$(LIBTOOL) --mode=compile $(CC) $(CPPFLAGS) $(CFLAGS) $(NUMERICFLAGS) -c -o $@ $<
+	$(LIBTOOL) --mode=compile $(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 lwin_wkt_parse.c lwin_wkt_parse.h: lwin_wkt_parse.y
+	@test -n "$(YACC)" || { \
+			echo "No yacc found, cannot build parser" >&2; \
+			false; \
+	}
 	$(YACC) -p wkt_yy -o'lwin_wkt_parse.c' -d lwin_wkt_parse.y
 
 lwin_wkt_lex.c: lwin_wkt_lex.l
+	@test -n "$(LEX)" || { \
+			echo "No lex found, cannot build parser" >&2; \
+			false; \
+	}
 	$(LEX) -i lwin_wkt_lex.l
 
 liblwgeom.h: liblwgeom.h.in

@@ -35,6 +35,7 @@
 /* #define PARANOIA_LEVEL 2 */
 #undef LWGEOM_PROFILE_MAKEVALID
 
+#if POSTGIS_GEOS_VERSION < 38
 /*
  * Return Nth vertex in GEOSGeometry as a POINT.
  * May return NULL if the geometry has NO vertex.
@@ -108,6 +109,7 @@ LWGEOM_GEOS_getPointN(const GEOSGeometry* g_in, uint32_t n)
 
 	return GEOSGeom_createPoint(seq_out);
 }
+#endif
 
 LWGEOM* lwcollection_make_geos_friendly(LWCOLLECTION* g);
 LWGEOM* lwline_make_geos_friendly(LWLINE* line);
@@ -313,6 +315,8 @@ lwcollection_make_geos_friendly(LWCOLLECTION* g)
 
 	return (LWGEOM*)ret;
 }
+
+#if POSTGIS_GEOS_VERSION < 38
 
 /*
  * Fully node given linework
@@ -573,11 +577,15 @@ LWGEOM_GEOS_makeValidMultiLine(const GEOSGeometry* gin)
 		const GEOSGeometry* g = GEOSGetGeometryN(gin, i);
 		GEOSGeometry* vg;
 		vg = LWGEOM_GEOS_makeValidLine(g);
+		/* Drop any invalid or empty geometry */
+		if (!vg)
+			continue;
 		if (GEOSisEmpty(vg))
 		{
-			/* we don't care about this one */
 			GEOSGeom_destroy(vg);
+			continue;
 		}
+
 		if (GEOSGeomTypeId(vg) == GEOS_POINT)
 			points[npoints++] = vg;
 		else if (GEOSGeomTypeId(vg) == GEOS_LINESTRING)
@@ -827,7 +835,7 @@ LWGEOM_GEOS_makeValid(const GEOSGeometry* gin)
 		pd = GEOSDifference(pi, po); /* input points - output points */
 		GEOSGeom_destroy(pi);
 		GEOSGeom_destroy(po);
-		loss = !GEOSisEmpty(pd);
+		loss = pd && !GEOSisEmpty(pd);
 		GEOSGeom_destroy(pd);
 		if (loss)
 		{
@@ -839,6 +847,7 @@ LWGEOM_GEOS_makeValid(const GEOSGeometry* gin)
 
 	return gout;
 }
+#endif
 
 /* Exported. Uses GEOS internally */
 LWGEOM*
@@ -885,7 +894,11 @@ lwgeom_make_valid(LWGEOM* lwgeom_in)
 		lwgeom_out = lwgeom_in;
 	}
 
+#if POSTGIS_GEOS_VERSION < 38
 	geosout = LWGEOM_GEOS_makeValid(geosgeom);
+#else
+	geosout = GEOSMakeValid(geosgeom);
+#endif
 	GEOSGeom_destroy(geosgeom);
 	if (!geosout) return NULL;
 

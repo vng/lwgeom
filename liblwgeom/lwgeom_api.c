@@ -29,9 +29,11 @@
 #include "lwgeom_log.h"
 
 #include <stdio.h>
-#include <errno.h>
 #include <assert.h>
-#include "../postgis_svn_revision.h"
+#include "../postgis_revision.h"
+
+#define xstr(s) str(s)
+#define str(s) #s
 
 const char *
 lwgeom_version()
@@ -41,7 +43,7 @@ lwgeom_version()
   if ( ! ptr )
   {
     ptr = buf;
-    snprintf(ptr, 256, LIBLWGEOM_VERSION" r%d", POSTGIS_SVN_REVISION);
+    snprintf(ptr, 256, LIBLWGEOM_VERSION" " xstr(POSTGIS_REVISION));
   }
 
   return ptr;
@@ -51,7 +53,12 @@ lwgeom_version()
 inline float
 next_float_down(double d)
 {
-	float result  = d;
+	float result;
+	if (d > (double)FLT_MAX)
+		return FLT_MAX;
+	if (d <= (double)-FLT_MAX)
+		return -FLT_MAX;
+	result = d;
 
 	if ( ((double)result) <=d )
 		return result;
@@ -67,7 +74,12 @@ next_float_down(double d)
 inline float
 next_float_up(double d)
 {
-	float result  = d;
+	float result;
+	if (d >= (double)FLT_MAX)
+		return FLT_MAX;
+	if (d < (double)-FLT_MAX)
+		return -FLT_MAX;
+	result = d;
 
 	if ( ((double)result) >=d )
 		return result;
@@ -166,8 +178,6 @@ getPoint4d_p(const POINTARRAY *pa, uint32_t n, POINT4D *op)
 
 }
 
-
-
 /*
  * Copy a point from the point array into the parameter point
  * will set point's z=NO_Z_VALUE if pa is 2d
@@ -212,6 +222,7 @@ getPoint3dz_p(const POINTARRAY *pa, uint32_t n, POINT3DZ *op)
 		return 0;
 	}
 
+	//assert(n < pa->npoints); --causes point emtpy/point empty to crash
 	if ( n>=pa->npoints )
 	{
 		lwnotice("%s [%d] called with n=%d and npoints=%d", __FILE__, __LINE__, n, pa->npoints);
@@ -259,34 +270,30 @@ getPoint3dm_p(const POINTARRAY *pa, uint32_t n, POINT3DM *op)
 	uint8_t *ptr;
 	int zmflag;
 
-	if ( ! pa )
+	if (!pa)
 	{
 		lwerror("%s [%d] NULL POINTARRAY input", __FILE__, __LINE__);
-		return 0;
+		return LW_FALSE;
 	}
 
-	if ( n>=pa->npoints )
+	if (n >= pa->npoints)
 	{
-		lwnotice("%s [%d] called with n=%d and npoints=%d", __FILE__, __LINE__, n, pa->npoints);
-		return 0;
+		lwerror("%s [%d] called with n=%d and npoints=%d", __FILE__, __LINE__, n, pa->npoints);
+		return LW_FALSE;
 	}
-
-	LWDEBUGF(2, "getPoint3dm_p(%d) called on array of %d-dimensions / %u pts",
-	         n, FLAGS_NDIMS(pa->flags), pa->npoints);
-
 
 	/* Get a pointer to nth point offset and zmflag */
-	ptr=getPoint_internal(pa, n);
-	zmflag=FLAGS_GET_ZM(pa->flags);
+	ptr = getPoint_internal(pa, n);
+	zmflag = FLAGS_GET_ZM(pa->flags);
 
 	/*
 	 * if input POINTARRAY has the M and NO Z,
 	 * we can issue a single memcpy
 	 */
-	if ( zmflag == 1 )
+	if (zmflag == 1)
 	{
 		memcpy(op, ptr, sizeof(POINT3DM));
-		return 1;
+		return LW_TRUE;
 	}
 
 	/*
@@ -300,19 +307,16 @@ getPoint3dm_p(const POINTARRAY *pa, uint32_t n, POINT3DM *op)
 	 * copy next double, otherwise initialize
 	 * M to NO_M_VALUE
 	 */
-	if ( zmflag == 3 )
+	if (zmflag == 3)
 	{
-		ptr+=sizeof(POINT3DZ);
+		ptr += sizeof(POINT3DZ);
 		memcpy(&(op->m), ptr, sizeof(double));
 	}
 	else
-	{
-		op->m=NO_M_VALUE;
-	}
+		op->m = NO_M_VALUE;
 
-	return 1;
+	return LW_TRUE;
 }
-
 
 /*
  * Copy a point from the point array into the parameter point
@@ -354,66 +358,6 @@ getPoint2d_p(const POINTARRAY *pa, uint32_t n, POINT2D *point)
 	return 1;
 }
 
-/**
-* Returns a pointer into the POINTARRAY serialized_ptlist,
-* suitable for reading from. This is very high performance
-* and declared const because you aren't allowed to muck with the
-* values, only read them.
-*/
-const POINT2D*
-getPoint2d_cp(const POINTARRAY *pa, uint32_t n)
-{
-	if ( ! pa ) return 0;
-
-	if ( n>=pa->npoints )
-	{
-		lwerror("getPoint2d_cp: point offset out of range");
-		return 0; /*error */
-	}
-
-	return (const POINT2D*)getPoint_internal(pa, n);
-}
-
-const POINT3DZ*
-getPoint3dz_cp(const POINTARRAY *pa, uint32_t n)
-{
-	if ( ! pa ) return 0;
-
-	if ( ! FLAGS_GET_Z(pa->flags) )
-	{
-		lwerror("getPoint3dz_cp: no Z coordinates in point array");
-		return 0; /*error */
-	}
-
-	if ( n>=pa->npoints )
-	{
-		lwerror("getPoint3dz_cp: point offset out of range");
-		return 0; /*error */
-	}
-
-	return (const POINT3DZ*)getPoint_internal(pa, n);
-}
-
-const POINT4D*
-getPoint4d_cp(const POINTARRAY* pa, uint32_t n)
-{
-	if (!pa) return 0;
-
-	if (!(FLAGS_GET_Z(pa->flags) && FLAGS_GET_M(pa->flags)))
-	{
-		lwerror("getPoint4d_cp: no Z and M coordinates in point array");
-		return 0; /*error */
-	}
-
-	if (n >= pa->npoints)
-	{
-		lwerror("getPoint4d_cp: point offset out of range");
-		return 0; /*error */
-	}
-
-	return (const POINT4D*)getPoint_internal(pa, n);
-}
-
 /*
  * set point N to the given value
  * NOTE that the pointarray can be of any
@@ -426,7 +370,7 @@ ptarray_set_point4d(POINTARRAY *pa, uint32_t n, const POINT4D *p4d)
 {
 	uint8_t *ptr;
 	assert(n < pa->npoints);
-	ptr=getPoint_internal(pa, n);
+	ptr = getPoint_internal(pa, n);
 	switch ( FLAGS_GET_ZM(pa->flags) )
 	{
 	case 3:
@@ -508,23 +452,24 @@ void printPA(POINTARRAY *pa)
 	         FLAGS_NDIMS(pa->flags), ptarray_point_size(pa));
 	lwnotice("                 npoints = %i", pa->npoints);
 
-	for (t =0; t<pa->npoints; t++)
+	if (!pa)
 	{
-		getPoint4d_p(pa, t, &pt);
-		if (FLAGS_NDIMS(pa->flags) == 2)
+		lwnotice("                    PTARRAY is null pointer!");
+	}
+	else
+	{
+
+		for (t = 0; t < pa->npoints; t++)
 		{
-			lwnotice("                    %i : %lf,%lf",t,pt.x,pt.y);
-		}
-		if (FLAGS_NDIMS(pa->flags) == 3)
-		{
-			lwnotice("                    %i : %lf,%lf,%lf",t,pt.x,pt.y,pt.z);
-		}
-		if (FLAGS_NDIMS(pa->flags) == 4)
-		{
-			lwnotice("                    %i : %lf,%lf,%lf,%lf",t,pt.x,pt.y,pt.z,pt.m);
+			getPoint4d_p(pa, t, &pt);
+			if (FLAGS_NDIMS(pa->flags) == 2)
+				lwnotice("                    %i : %lf,%lf", t, pt.x, pt.y);
+			if (FLAGS_NDIMS(pa->flags) == 3)
+				lwnotice("                    %i : %lf,%lf,%lf", t, pt.x, pt.y, pt.z);
+			if (FLAGS_NDIMS(pa->flags) == 4)
+				lwnotice("                    %i : %lf,%lf,%lf,%lf", t, pt.x, pt.y, pt.z, pt.m);
 		}
 	}
-
 	lwnotice("      }");
 }
 

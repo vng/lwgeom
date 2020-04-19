@@ -38,12 +38,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <float.h>
+#include <math.h>
 
 #if HAVE_IEEEFP_H
 #include <ieeefp.h>
 #endif
-
-#include <float.h>
 
 #include "liblwgeom.h"
 
@@ -116,10 +117,18 @@
 /**
 * Macro for reading the size from the GSERIALIZED size attribute.
 * Cribbed from PgSQL, top 30 bits are size. Use VARSIZE() when working
-* internally with PgSQL.
+* internally with PgSQL. See SET_VARSIZE_4B / VARSIZE_4B in
+* PGSRC/src/include/postgres.h for details.
 */
+#ifdef WORDS_BIGENDIAN
+#define SIZE_GET(varsize) ((varsize) & 0x3FFFFFFF)
+#define SIZE_SET(varsize, len) ((varsize) = ((len) & 0x3FFFFFFF))
+#define IS_BIG_ENDIAN 1
+#else
 #define SIZE_GET(varsize) (((varsize) >> 2) & 0x3FFFFFFF)
-#define SIZE_SET(varsize, size) (((varsize) & 0x00000003)|(((size) & 0x3FFFFFFF) << 2 ))
+#define SIZE_SET(varsize, len) ((varsize) = (((uint32_t)(len)) << 2))
+#define IS_BIG_ENDIAN 0
+#endif
 
 /**
 * Macro that returns:
@@ -137,12 +146,20 @@
 /*
  * Export functions
  */
+
+/* Any number higher than this will always be printed in scientific notation */
 #define OUT_MAX_DOUBLE 1E15
-#define OUT_SHOW_DIGS_DOUBLE 20
+
+/* Limit for the max amount of decimal digits to show, e.g: 0.123456789012345 has 15 */
 #define OUT_MAX_DOUBLE_PRECISION 15
+
+/* Limits for the max amount of digits to show, e.g: 1234567890.12345678 has 18 digits */
+/* This used to be 20 but it never worked as announced and OUT_MAX_DOUBLE_PRECISION was used instead */
+#define OUT_SHOW_DIGS_DOUBLE 15
+
+/* Limit for the max amount of characters that a double can use, including dot and sign */
 #define OUT_MAX_DIGS_DOUBLE (OUT_SHOW_DIGS_DOUBLE + 2) /* +2 mean add dot and sign */
-#define OUT_DOUBLE_BUFFER_SIZE \
-	OUT_MAX_DIGS_DOUBLE + OUT_MAX_DOUBLE_PRECISION + 1
+#define OUT_DOUBLE_BUFFER_SIZE OUT_MAX_DIGS_DOUBLE + 1 /* +1 including NULL */
 
 /**
 * Constants for point-in-polygon return values
@@ -158,18 +175,17 @@
 /* Machine endianness */
 #define XDR 0 /* big endian */
 #define NDR 1 /* little endian */
-extern char getMachineEndian(void);
 
 
 /*
 * Force dims
 */
-LWGEOM* lwgeom_force_dims(const LWGEOM *lwgeom, int hasz, int hasm);
-LWPOINT* lwpoint_force_dims(const LWPOINT *lwpoint, int hasz, int hasm);
-LWLINE* lwline_force_dims(const LWLINE *lwline, int hasz, int hasm);
-LWPOLY* lwpoly_force_dims(const LWPOLY *lwpoly, int hasz, int hasm);
-LWCOLLECTION* lwcollection_force_dims(const LWCOLLECTION *lwcol, int hasz, int hasm);
-POINTARRAY* ptarray_force_dims(const POINTARRAY *pa, int hasz, int hasm);
+LWGEOM* lwgeom_force_dims(const LWGEOM *lwgeom, int hasz, int hasm, double zval, double mval);
+LWPOINT* lwpoint_force_dims(const LWPOINT *lwpoint, int hasz, int hasm, double zval, double mval);
+LWLINE* lwline_force_dims(const LWLINE *lwline, int hasz, int hasm, double zval, double mval);
+LWPOLY* lwpoly_force_dims(const LWPOLY *lwpoly, int hasz, int hasm, double zval, double mval);
+LWCOLLECTION* lwcollection_force_dims(const LWCOLLECTION *lwcol, int hasz, int hasm, double zval, double mval);
+POINTARRAY* ptarray_force_dims(const POINTARRAY *pa, int hasz, int hasm, double zval, double mval);
 
 /**
  * Swap ordinate values o1 and o2 on a given POINTARRAY
@@ -202,7 +218,7 @@ uint32_t lwcollection_count_vertices(LWCOLLECTION *col);
 /**
  * @param minpts minimum number of points to retain, if possible.
  */
-void ptarray_simplify_in_place(POINTARRAY *pa, double epsilon, uint32_t minpts);
+void ptarray_simplify_in_place(POINTARRAY *pa, double tolerance, uint32_t minpts);
 
 /*
 * The possible ways a pair of segments can interact. Returned by lw_segment_intersects
@@ -234,26 +250,6 @@ void lwpoint_set_ordinate(POINT4D *p, char ordinate, double value);
 int point_interpolate(const POINT4D *p1, const POINT4D *p2, POINT4D *p, int hasz, int hasm, char ordinate, double interpolation_value);
 
 
-/**
-* Clip a line based on the from/to range of one of its ordinates. Use for m- and z- clipping
-*/
-LWCOLLECTION *lwline_clip_to_ordinate_range(const LWLINE *line, char ordinate, double from, double to);
-
-/**
-* Clip a multi-line based on the from/to range of one of its ordinates. Use for m- and z- clipping
-*/
-LWCOLLECTION *lwmline_clip_to_ordinate_range(const LWMLINE *mline, char ordinate, double from, double to);
-
-/**
-* Clip a multi-point based on the from/to range of one of its ordinates. Use for m- and z- clipping
-*/
-LWCOLLECTION *lwmpoint_clip_to_ordinate_range(const LWMPOINT *mpoint, char ordinate, double from, double to);
-
-/**
-* Clip a point based on the from/to range of one of its ordinates. Use for m- and z- clipping
-*/
-LWCOLLECTION *lwpoint_clip_to_ordinate_range(const LWPOINT *mpoint, char ordinate, double from, double to);
-
 /*
 * Geohash
 */
@@ -282,6 +278,19 @@ double lwtriangle_area(const LWTRIANGLE *triangle);
 int gserialized_read_gbox_p(const GSERIALIZED *g, GBOX *gbox);
 
 /*
+ * Populate a bounding box *without* allocating an LWGEOM. Useful for some performance
+ * purposes. Use only if gserialized_read_gbox_p failed
+ */
+int gserialized_peek_gbox_p(const GSERIALIZED *g, GBOX *gbox);
+
+/**
+* Calculate required memory segment to contain a serialized form of the LWGEOM.
+* Primarily used internally by the serialization code. Exposed to allow the cunit
+* tests to exercise it.
+*/
+size_t gserialized_from_lwgeom_size(const LWGEOM *geom);
+
+/*
 * Length calculations
 */
 double lwcompound_length(const LWCOMPOUND *comp);
@@ -300,7 +309,6 @@ double lwtriangle_perimeter_2d(const LWTRIANGLE *triangle);
 /*
 * Segmentization
 */
-LWLINE *lwcompound_stroke(const LWCOMPOUND *icompound, uint32_t perQuad);
 LWPOLY *lwcurvepoly_stroke(const LWCURVEPOLY *curvepoly, uint32_t perQuad);
 
 /*
@@ -363,11 +371,6 @@ char lwcollection_same(const LWCOLLECTION *p1, const LWCOLLECTION *p2);
 char lwcircstring_same(const LWCIRCSTRING *p1, const LWCIRCSTRING *p2);
 
 /*
-* Transform
-*/
-int point4d_transform(POINT4D *pt, projPJ srcpj, projPJ dstpj);
-
-/*
 * Shift
 */
 void ptarray_longitude_shift(POINTARRAY *pa);
@@ -416,25 +419,6 @@ int lwtin_is_closed(const LWTIN *tin);
 /**
 * Snap to grid
 */
-
-/**
-* Snap-to-grid Support
-*/
-typedef struct gridspec_t
-{
-	double ipx;
-	double ipy;
-	double ipz;
-	double ipm;
-	double xsize;
-	double ysize;
-	double zsize;
-	double msize;
-}
-gridspec;
-
-LWGEOM* lwgeom_grid(const LWGEOM *lwgeom, const gridspec *grid);
-void lwgeom_grid_in_place(LWGEOM *lwgeom, const gridspec *grid);
 void ptarray_grid_in_place(POINTARRAY *pa, const gridspec *grid);
 
 /*
@@ -482,7 +466,7 @@ double gbox_angular_width(const GBOX* gbox);
 int gbox_centroid(const GBOX* gbox, POINT2D* out);
 
 /* Utilities */
-int lwprint_double(double d, int maxdd, char* buf, size_t bufsize);
+int lwprint_double(double d, uint32_t maxdd, char *buf, size_t bufsize);
 extern uint8_t MULTITYPE[NUMTYPES];
 
 extern lwinterrupt_callback *_lwgeom_interrupt_callback;
@@ -502,5 +486,6 @@ int ptarray_npoints_in_rect(const POINTARRAY *pa, const GBOX *gbox);
 int gbox_contains_point2d(const GBOX *g, const POINT2D *p);
 int lwpoly_contains_point(const LWPOLY *poly, const POINT2D *pt);
 POINT4D* lwmpoint_extract_points_4d(const LWMPOINT* g, uint32_t* npoints, int* input_empty);
+char* lwstrdup(const char* a);
 
 #endif /* _LIBLWGEOM_INTERNAL_H */

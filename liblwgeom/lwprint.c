@@ -23,11 +23,12 @@
  *
  **********************************************************************/
 
+#include "liblwgeom_internal.h"
 
+#include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
-#include "liblwgeom_internal.h"
 
 /* Ensures the given lat and lon are in the "normal" range:
  * -90 to +90 for lat, -180 to +180 for lon. */
@@ -438,48 +439,48 @@ char* lwpoint_to_latlon(const LWPOINT * pt, const char *format)
 	return lwdoubles_to_latlon(p->y, p->x, format);
 }
 
-/*
- * Removes trailing zeros and dot for a %f formatted number.
- * Modifies input.
+/**
+ * Returns the decimal length of a double. 0 for special cases (inf)
  */
-static void
-trim_trailing_zeros(char* str)
+static inline uint32_t
+lwdecimal_length(const double d)
 {
-	char *ptr, *totrim = NULL;
-	int len;
-	int i;
-
-	LWDEBUGF(3, "input: %s", str);
-
-	ptr = strchr(str, '.');
-	if (!ptr) return; /* no dot, no decimal digits */
-
-	LWDEBUGF(3, "ptr: %s", ptr);
-
-	len = strlen(ptr);
-	for (i = len - 1; i; i--)
+	assert(d >= 0.0);
+	if (d > OUT_MAX_DOUBLE)
 	{
-		if (ptr[i] != '0') break;
-		totrim = &ptr[i];
+		if (isinf(d))
+			return 0;
+		return floor(log10(d)) + 1;
 	}
-	if (totrim)
-	{
-		if (ptr == totrim - 1)
-			*ptr = '\0';
-		else
-			*totrim = '\0';
-	}
+	int64_t v = (int64_t) d;
+	/* For compatibility with the previous implementation, we assume 0 has 0 digits,
+	 * although that's clearly not the case */
+	if (v == 0) { return 0; }
+	if (v < 10) { return 1; }
+	if (v < 100) { return 2; }
+	if (v < 1000) { return 3; }
+	if (v < 10000) { return 4; }
+	if (v < 100000) { return 5; }
+	if (v < 1000000) { return 6; }
+	if (v < 10000000) { return 7; }
+	if (v < 100000000) { return 8; }
+	if (v < 1000000000) { return 9; }
+	if (v < 10000000000) { return 10; }
+	if (v < 100000000000) { return 11; }
+	if (v < 1000000000000) { return 12; }
+	if (v < 10000000000000) { return 13; }
+	if (v < 100000000000000) { return 14; }
 
-	LWDEBUGF(3, "output: %s", str);
+	return 15;
 }
 
 /*
- * Print an ordinate value using at most the given number of decimal digits
+ * Print an ordinate value using at most **maxdd** number of decimal digits
  *
  * The actual number of printed decimal digits may be less than the
  * requested ones if out of significant digits.
  *
- * The function will not write more than maxsize bytes, including the
+ * The function will not write more than bufsize bytes, including the
  * terminating NULL. Returns the number of bytes that would have been
  * written if there was enough space (excluding terminating NULL).
  * So a return of ``bufsize'' or more means that the string was
@@ -487,19 +488,21 @@ trim_trailing_zeros(char* str)
  *
  */
 int
-lwprint_double(double d, int maxdd, char* buf, size_t bufsize)
+lwprint_double(double d, uint32_t maxdd, char *buf, size_t bufsize)
 {
+	assert(bufsize >= OUT_DOUBLE_BUFFER_SIZE);
+
+	int length;
 	double ad = fabs(d);
-	int ndd;
-	int length = 0;
 	if (ad <= FP_TOLERANCE)
 	{
-		d = 0;
-		ad = 0;
+		buf[0] = '0';
+		buf[1] = '\0';
+		return 1;
 	}
 	if (ad < OUT_MAX_DOUBLE)
 	{
-		ndd = ad < 1 ? 0 : floor(log10(ad)) + 1; /* non-decimal digits */
+		int ndd = ad < 1 ? 0 : floor(log10(ad)) + 1; /* non-decimal digits */
 		if (maxdd > (OUT_MAX_DOUBLE_PRECISION - ndd)) maxdd -= ndd;
 		length = snprintf(buf, bufsize, "%.*f", maxdd, d);
 	}
@@ -507,6 +510,7 @@ lwprint_double(double d, int maxdd, char* buf, size_t bufsize)
 	{
 		length = snprintf(buf, bufsize, "%g", d);
 	}
-	trim_trailing_zeros(buf);
+	buf[length] = '\0';
+
 	return length;
 }

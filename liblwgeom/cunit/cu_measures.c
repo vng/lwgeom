@@ -19,6 +19,7 @@
 #include "liblwgeom_internal.h"
 #include "cu_tester.h"
 #include "measures.h"
+#include "measures3d.h"
 #include "lwtree.h"
 
 static LWGEOM* lwgeom_from_text(const char *str)
@@ -29,9 +30,19 @@ static LWGEOM* lwgeom_from_text(const char *str)
 	return r.geom;
 }
 
-#define DIST2DTEST(str1, str2, res) do_test_mindistance2d_tolerance(str1, str2, res, __LINE__)
+#define DIST2DTEST(str1, str2, res) \
+	do_test_mindistance_tolerance(str1, str2, res, __LINE__, lwgeom_mindistance2d_tolerance);\
+	do_test_mindistance_tolerance(str2, str1, res, __LINE__, lwgeom_mindistance2d_tolerance)
+#define DIST3DTEST(str1, str2, res) \
+	do_test_mindistance_tolerance(str1, str2, res, __LINE__, lwgeom_mindistance3d_tolerance);\
+	do_test_mindistance_tolerance(str2, str1, res, __LINE__, lwgeom_mindistance3d_tolerance)
 
-static void do_test_mindistance2d_tolerance(char *in1, char *in2, double expected_res, int line)
+static void
+do_test_mindistance_tolerance(char *in1,
+			      char *in2,
+			      double expected_res,
+			      int line,
+			      double (*distancef)(const LWGEOM *, const LWGEOM *, double))
 {
 	LWGEOM *lw1;
 	LWGEOM *lw2;
@@ -53,7 +64,10 @@ static void do_test_mindistance2d_tolerance(char *in1, char *in2, double expecte
 		exit(1);
 	}
 
-	distance = lwgeom_mindistance2d_tolerance(lw1, lw2, 0.0);
+	FLAGS_SET_SOLID(lw1->flags, 1);
+	FLAGS_SET_SOLID(lw2->flags, 1);
+
+	distance = distancef(lw1, lw2, 0.0);
 	lwgeom_free(lw1);
 	lwgeom_free(lw2);
 
@@ -191,6 +205,102 @@ static void test_mindistance2d_tolerance(void)
 	*/
 	DIST2DTEST("LINESTRING(0.5 1,0.5 3)", "MULTICURVE(CIRCULARSTRING(2 3,3 2,2 1,1 2,2 3),(0 0, 0 5))", 0.5);
 
+}
+
+static void
+test_mindistance3d_tolerance(void)
+{
+	/* 2D [Z=0] should work just the same */
+	DIST3DTEST("POINT(0 0 0)", "MULTIPOINT(0 1.5 0, 0 2 0, 0 2.5 0)", 1.5);
+	DIST3DTEST("POINT(0 0 0)", "MULTIPOINT(0 1.5 0, 0 2 0, 0 2.5 0)", 1.5);
+	DIST3DTEST("POINT(0 0 0)", "GEOMETRYCOLLECTION(POINT(3 4 0))", 5.0);
+	DIST3DTEST("POINT(0 0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0)))", 5.0);
+	DIST3DTEST("POINT(0 0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0))))", 5.0);
+	DIST3DTEST("POINT(0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4))))", 5.0);
+	DIST3DTEST("GEOMETRYCOLLECTION(POINT(0 0 0))", "GEOMETRYCOLLECTION(POINT(3 4 0))", 5.0);
+	DIST3DTEST("GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(0 0 0)))",
+		   "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0)))",
+		   5.0);
+	DIST3DTEST("GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(0 0 0)))",
+		   "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4 0)))",
+		   5.0);
+	DIST3DTEST("LINESTRING(-2 0 0, -0.2 0 0)", "POINT(-2 0 0)", 0);
+	DIST3DTEST("LINESTRING(-0.2 0 0, -2 0 0)", "POINT(-2 0 0)", 0);
+	DIST3DTEST("LINESTRING(-1e-8 0 0, -0.2 0 0)", "POINT(-1e-8 0 0)", 0);
+	DIST3DTEST("LINESTRING(-0.2 0 0, -1e-8 0 0)", "POINT(-1e-8 0 0)", 0);
+
+	/* Tests around intersections */
+	DIST3DTEST("LINESTRING(1 0 0 , 2 0 0)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 1.0);
+	DIST3DTEST("LINESTRING(1 1 1 , 2 1 0)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 0.0);
+	DIST3DTEST("LINESTRING(1 1 1 , 2 1 1)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 1.0);
+
+	/* Same but triangles */
+	DIST3DTEST("LINESTRING(1 0 0 , 2 0 0)", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 1.0);
+	DIST3DTEST("LINESTRING(1 1 1 , 2 1 0)", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 0.0);
+	DIST3DTEST("LINESTRING(1 1 1 , 2 1 1)", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 1.0);
+
+	/* Triangle to triangle*/
+	DIST3DTEST("TRIANGLE((-1 1 0, -2 1 0, -1 2 0, -1 1 0))", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 2.0);
+
+	/* Line in polygon */
+	DIST3DTEST("LINESTRING(1 1 1 , 2 2 2)", "POLYGON((0 0 0, 2 2 2, 3 3 1, 0 0 0))", 0.0);
+
+	/* Line has a point in the same plane as the polygon but isn't the closest*/
+	DIST3DTEST("LINESTRING(-10000 -10000 0, 0 0 1)", "POLYGON((0 0 0, 1 0 0, 1 1 0, 0 1 0, 0 0 0))", 1);
+
+	/* This is an invalid polygon since it defines just a line */
+	DIST3DTEST("LINESTRING(1 1 1, 2 2 2)", "POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", 0);
+	DIST3DTEST("TRIANGLE((1 1 1, 2 2 2, 3 3 3, 1 1 1))", "POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", 0);
+	DIST3DTEST("POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", "TRIANGLE((1 1 1, 2 2 2, 3 3 3, 1 1 1))", 0);
+	DIST3DTEST("TRIANGLE((0 0 0, 2 2 2, 3 3 3, 0 0 0))", "LINESTRING(1 1 1, 2 2 2)", 0);
+
+	/* A box in a box: two solids, one inside another */
+	DIST3DTEST(
+	    "POLYHEDRALSURFACE Z (((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((0 1 0,0 1 1,1 1 1,1 1 0,0 1 0)))",
+	    "POLYHEDRALSURFACE Z (((-1 -1 -1,-1 2 -1,2 2 -1,2 -1 -1,-1 -1 -1)),((-1 -1 2,2 -1 2,2 2 2,-1 2 2,-1 -1 2)),((-1 -1 -1,-1 -1 2,-1 2 2,-1 2 -1,-1 -1 -1)),((2 -1 -1,2 2 -1,2 2 2,2 -1 2,2 -1 -1)),((-1 -1 -1,2 -1 -1,2 -1 2,-1 -1 2,-1 -1 -1)),((-1 2 -1,-1 2 2,2 2 2,2 2 -1,-1 2 -1)))",
+	    0);
+
+	/* A box in a box with a hat: two solids, one inside another, Z ray up is hitting hat */
+	DIST3DTEST(
+	    "POLYHEDRALSURFACE Z (((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((0 1 0,0 1 1,1 1 1,1 1 0,0 1 0)))",
+	    "POLYHEDRALSURFACE Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	    0);
+
+	/* Same but as TIN */
+	DIST3DTEST(
+	    "TIN Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	    "POLYHEDRALSURFACE Z (((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((0 1 0,0 1 1,1 1 1,1 1 0,0 1 0)))",
+	    0);
+
+	/* Same but both are TIN */
+	DIST3DTEST(
+	    "TIN Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	    "TIN Z (((0 0 0,0 1 0,1 1 0,0 0 0)),((1 0 0,0 0 0,1 1 0,1 0 0)),((0 1 1,1 0 1,1 1 1,0 1 1)),((0 1 1,0 0 1,1 0 1,0 1 1)),((0 0 0,0 0 1,0 1 1,0 0 0)),((0 1 0,0 0 0,0 1 1,0 1 0)),((1 0 1,1 1 0,1 1 1,1 0 1)),((1 0 1,1 0 0,1 1 0,1 0 1)),((0 0 1,1 0 0,1 0 1,0 0 1)),((0 0 1,0 0 0,1 0 0,0 0 1)),((0 1 0,0 1 1,1 1 1,0 1 0)),((1 1 0,0 1 0,1 1 1,1 1 0)))",
+	    0);
+
+	/* Point inside TIN */
+	DIST3DTEST(
+	    "TIN Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	    "POINT(0 0 0)",
+	    0);
+
+	/* A point hits vertical Z edge */
+	DIST3DTEST(
+	    "POLYHEDRALSURFACE Z (((0 -1 1,-1 -1 1,-1 -1 -1,0 -1 -1,1 -1 -1,0 -1 2,0 -1 1)),((0 1 1,0 1 2,1 1 -1,0 1 -1,-1 1 -1,-1 1 1,0 1 1)),((0 -1 1,0 1 1,-1 1 1,-1 -1 1,0 -1 1)),((-1 -1 1,-1 1 1,-1 1 -1,-1 -1 -1,-1 -1 1)),((-1 -1 -1,-1 1 -1,0 1 -1,0 -1 -1,-1 -1 -1)),((0 -1 -1,0 1 -1,1 1 -1,1 -1 -1,0 -1 -1)),((1 -1 -1,1 1 -1,0 1 2,0 -1 2,1 -1 -1)),((0 -1 2,0 1 2,0 1 1,0 -1 1,0 -1 2)))",
+	    "POINT(0 0 0)",
+	    0);
+
+	/* A point in the middle of a hole of extruded polygon */
+	DIST3DTEST(
+	    "POLYHEDRALSURFACE Z (((-3 -3 0,-3 3 0,3 3 0,3 -3 0,-3 -3 0),(-1 -1 0,1 -1 0,1 1 0,-1 1 0,-1 -1 0)),((-3 -3 3,3 -3 3,3 3 3,-3 3 3,-3 -3 3),(-1 -1 3,-1 1 3,1 1 3,1 -1 3,-1 -1 3)),((-3 -3 0,-3 -3 3,-3 3 3,-3 3 0,-3 -3 0)),((-3 3 0,-3 3 3,3 3 3,3 3 0,-3 3 0)),((3 3 0,3 3 3,3 -3 3,3 -3 0,3 3 0)),((3 -3 0,3 -3 3,-3 -3 3,-3 -3 0,3 -3 0)),((-1 -1 0,-1 -1 3,1 -1 3,1 -1 0,-1 -1 0)),((1 -1 0,1 -1 3,1 1 3,1 1 0,1 -1 0)),((1 1 0,1 1 3,-1 1 3,-1 1 0,1 1 0)),((-1 1 0,-1 1 3,-1 -1 3,-1 -1 0,-1 1 0)))",
+	    "POINT(0 0 1)",
+	    1);
+
+	/* A point at the face of a hole of extruded polygon */
+	DIST3DTEST(
+	    "POLYHEDRALSURFACE Z (((-3 -3 0,-3 3 0,3 3 0,3 -3 0,-3 -3 0),(-1 -1 0,1 -1 0,1 1 0,-1 1 0,-1 -1 0)),((-3 -3 3,3 -3 3,3 3 3,-3 3 3,-3 -3 3),(-1 -1 3,-1 1 3,1 1 3,1 -1 3,-1 -1 3)),((-3 -3 0,-3 -3 3,-3 3 3,-3 3 0,-3 -3 0)),((-3 3 0,-3 3 3,3 3 3,3 3 0,-3 3 0)),((3 3 0,3 3 3,3 -3 3,3 -3 0,3 3 0)),((3 -3 0,3 -3 3,-3 -3 3,-3 -3 0,3 -3 0)),((-1 -1 0,-1 -1 3,1 -1 3,1 -1 0,-1 -1 0)),((1 -1 0,1 -1 3,1 1 3,1 1 0,1 -1 0)),((1 1 0,1 1 3,-1 1 3,-1 1 0,1 1 0)),((-1 1 0,-1 1 3,-1 -1 3,-1 -1 0,-1 1 0)))",
+	    "POINT(1 1 2)",
+	    0);
 }
 
 static int tree_pt(RECT_NODE *tree, double x, double y)
@@ -518,17 +628,32 @@ test_lwgeom_segmentize2d(void)
 	lwgeom_free(linein);
 	lwgeom_free(lineout);
 
+	/* test that segmentize is proportional - request every 6, get every 5 */
+	linein = lwgeom_from_wkt("LINESTRING(0 0, 20 0)", LW_PARSER_CHECK_NONE);
+	lineout = lwgeom_segmentize2d(linein, 6);
+	strout = lwgeom_to_ewkt(lineout);
+	ASSERT_STRING_EQUAL(strout, "LINESTRING(0 0,5 0,10 0,15 0,20 0)");
+	lwfree(strout);
+	lwgeom_free(linein);
+	lwgeom_free(lineout);
+
+	/* test too many segments */
+	linein = lwgeom_from_wkt("LINESTRING(0 0,10 0)", LW_PARSER_CHECK_NONE);
+	lineout = lwgeom_segmentize2d(linein, 1e-100);
+	CU_ASSERT_EQUAL(lineout, NULL);
+	lwgeom_free(linein);
+
 	/* test interruption */
 
 	linein = lwgeom_from_wkt("LINESTRING(0 0,10 0)", LW_PARSER_CHECK_NONE);
 	lwgeom_request_interrupt();
-	lineout = lwgeom_segmentize2d(linein, 1e-100);
+	lineout = lwgeom_segmentize2d(linein, INT32_MAX);
 	CU_ASSERT_EQUAL(lineout, NULL);
 	lwgeom_free(linein);
 
 	linein = lwgeom_from_wkt("MULTILINESTRING((0 0,10 0),(20 0, 30 0))", LW_PARSER_CHECK_NONE);
 	lwgeom_request_interrupt();
-	lineout = lwgeom_segmentize2d(linein, 1e-100);
+	lineout = lwgeom_segmentize2d(linein, INT32_MAX);
 	CU_ASSERT_EQUAL(lineout, NULL);
 	lwgeom_free(linein);
 
@@ -536,7 +661,7 @@ test_lwgeom_segmentize2d(void)
 	  "MULTIPOLYGON(((0 0,20 0,20 20,0 20,0 0),(2 2,2 4,4 4,4 2,2 2),(6 6,6 8,8 8,8 6,6 6)),((40 0,40 20,60 20,60 0,40 0),(42 2,42 4,44 4,44 2,42 2)))"
 	  , LW_PARSER_CHECK_NONE);
 	lwgeom_request_interrupt();
-	lineout = lwgeom_segmentize2d(linein, 1e-100);
+	lineout = lwgeom_segmentize2d(linein, INT32_MAX);
 	CU_ASSERT_EQUAL(lineout, NULL);
 	lwgeom_free(linein);
 
@@ -545,13 +670,15 @@ test_lwgeom_segmentize2d(void)
 	  , LW_PARSER_CHECK_NONE);
 	CU_ASSERT_FATAL(linein != NULL);
 	lwgeom_request_interrupt();
-	lineout = lwgeom_segmentize2d(linein, 1e-100);
+	lineout = lwgeom_segmentize2d(linein, INT32_MAX);
 	CU_ASSERT_EQUAL(lineout, NULL);
 	lwgeom_free(linein);
 
 	linein = lwgeom_from_wkt("LINESTRING(20 0, 30 0)", LW_PARSER_CHECK_NONE);
+	CU_ASSERT_FATAL(linein != NULL);
 	/* NOT INTERRUPTED */
 	lineout = lwgeom_segmentize2d(linein, 5);
+	CU_ASSERT_NOT_EQUAL_FATAL(lineout, NULL);
 	strout = lwgeom_to_ewkt(lineout);
 	ASSERT_STRING_EQUAL(strout, "LINESTRING(20 0,25 0,30 0)");
 	lwfree(strout);
@@ -749,6 +876,18 @@ test_lw_dist2d_arc_arc(void)
 	POINT2D A1, A2, A3, B1, B2, B3;
 	int rv;
 
+	/* Ticket #4326 */
+	lw_dist2d_distpts_init(&dl, DIST_MIN);
+	A1.x = -1.0; A1.y =  4.0;
+	A2.x =  0.0; A2.y =  5.0;
+	A3.x =  1.0; A3.y =  4.0;
+	B1.x =  1.0; B1.y =  6.0;
+	B2.x =  6.0; B2.y =  1.0;
+	B3.x =  9.0; B3.y =  7.0;
+	rv = lw_dist2d_arc_arc(&A1, &A2, &A3, &B1, &B2, &B3, &dl);
+	CU_ASSERT_EQUAL( rv, LW_SUCCESS );
+	CU_ASSERT_DOUBLE_EQUAL(dl.distance, 0.0475666, 0.000001);
+
 	/* Unit semicircle at 0,0 */
 	B1.x = -1; B1.y = 0;
 	B2.x = 0 ; B2.y = 1;
@@ -912,7 +1051,6 @@ test_lw_dist2d_arc_arc(void)
 	rv = lw_dist2d_arc_arc(&A1, &A2, &A3, &B1, &B2, &B3, &dl);
 	CU_ASSERT_EQUAL( rv, LW_SUCCESS );
 	CU_ASSERT_DOUBLE_EQUAL(dl.distance, 5.0, 0.000001);
-
 
 }
 
@@ -1387,6 +1525,7 @@ void measures_suite_setup(void)
 {
 	CU_pSuite suite = CU_add_suite("measures", NULL, NULL);
 	PG_ADD_TEST(suite, test_mindistance2d_tolerance);
+	PG_ADD_TEST(suite, test_mindistance3d_tolerance);
 	PG_ADD_TEST(suite, test_rect_tree_contains_point);
 	PG_ADD_TEST(suite, test_rect_tree_intersects_tree);
 	PG_ADD_TEST(suite, test_lwgeom_segmentize2d);

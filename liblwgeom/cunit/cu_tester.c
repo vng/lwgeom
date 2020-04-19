@@ -16,6 +16,8 @@
 #include "cu_tester.h"
 #include "../postgis_config.h"
 
+char cu_error_msg[MAX_CUNIT_ERROR_LENGTH + 1] = {0};
+
 /* Internal funcs */
 static void
 cu_errorreporter(const char *fmt, va_list ap);
@@ -33,6 +35,7 @@ extern void algorithms_suite_setup();
 extern void buildarea_suite_setup();
 extern void clean_suite_setup();
 extern void clip_by_rect_suite_setup();
+extern void force_dims_suite_setup(void);
 extern void force_sfs_suite_setup(void);
 extern void geodetic_suite_setup(void);
 extern void geos_suite_setup(void);
@@ -43,7 +46,8 @@ extern void in_encoded_polyline_suite_setup(void);
 extern void in_geojson_suite_setup(void);
 extern void iterator_suite_setup(void);
 extern void twkb_in_suite_setup(void);
-extern void libgeom_suite_setup(void);
+extern void gserialized1_suite_setup(void);
+extern void gserialized2_suite_setup(void);
 extern void lwstroke_suite_setup(void);
 extern void measures_suite_setup(void);
 extern void effectivearea_suite_setup(void);
@@ -83,6 +87,7 @@ PG_SuiteSetup setupfuncs[] =
 	buildarea_suite_setup,
 	clean_suite_setup,
 	clip_by_rect_suite_setup,
+	force_dims_suite_setup,
 	force_sfs_suite_setup,
 	geodetic_suite_setup,
 	geos_suite_setup,
@@ -95,7 +100,8 @@ PG_SuiteSetup setupfuncs[] =
 #endif
     iterator_suite_setup,
 	twkb_in_suite_setup,
-	libgeom_suite_setup,
+	gserialized1_suite_setup,
+	gserialized2_suite_setup,
 	lwstroke_suite_setup,
 	measures_suite_setup,
 	effectivearea_suite_setup,

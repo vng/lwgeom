@@ -20,49 +20,61 @@
 
 #include "liblwgeom_internal.h"
 
-static void test_geos_noop(void)
+static void
+test_geos_noop(void)
 {
 	size_t i;
+	char *in_ewkt;
+	char *out_ewkt;
+	LWGEOM *geom_in;
+	LWGEOM *geom_out;
 
-	char *ewkt[] =
-	{
-		"POINT(0 0.2)",
-		"LINESTRING(-1 -1,-1 2.5,2 2,2 -1)",
-		"MULTIPOINT(0.9 0.9,0.9 0.9,0.9 0.9,0.9 0.9,0.9 0.9,0.9 0.9)",
-		"SRID=1;MULTILINESTRING((-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1))",
-		"SRID=1;MULTILINESTRING((-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1))",
-		"POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0))",
-		"SRID=4326;POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0))",
-		"SRID=4326;POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5))",
-		"SRID=100000;POLYGON((-1 -1 3,-1 2.5 3,2 2 3,2 -1 3,-1 -1 3),(0 0 3,0 1 3,1 1 3,1 0 3,0 0 3),(-0.5 -0.5 3,-0.5 -0.4 3,-0.4 -0.4 3,-0.4 -0.5 3,-0.5 -0.5 3))",
-		"SRID=4326;MULTIPOLYGON(((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5)),((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5)))",
-		"SRID=4326;GEOMETRYCOLLECTION(POINT(0 1),POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0)),MULTIPOLYGON(((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5))))",
-		"GEOMETRYCOLLECTION( LINESTRING (1 1, 2 2), POINT EMPTY, TRIANGLE ((0 0, 1 0, 1 1, 0 0)) )",
+	char *ewkt[] = {
+	    "POINT(0 0.2)",
+	    "LINESTRING(-1 -1,-1 2.5,2 2,2 -1)",
+	    "MULTIPOINT(0.9 0.9,0.9 0.9,0.9 0.9,0.9 0.9,0.9 0.9,0.9 0.9)",
+	    "SRID=1;MULTILINESTRING((-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1))",
+	    "SRID=1;MULTILINESTRING((-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1),(-1 -1,-1 2.5,2 2,2 -1))",
+	    "POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0))",
+	    "SRID=4326;POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0))",
+	    "SRID=4326;POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5))",
+	    "SRID=100000;POLYGON((-1 -1 3,-1 2.5 3,2 2 3,2 -1 3,-1 -1 3),(0 0 3,0 1 3,1 1 3,1 0 3,0 0 3),(-0.5 -0.5 3,-0.5 -0.4 3,-0.4 -0.4 3,-0.4 -0.5 3,-0.5 -0.5 3))",
+	    "SRID=4326;MULTIPOLYGON(((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5)),((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5)))",
+	    "SRID=4326;GEOMETRYCOLLECTION(POINT(0 1),POLYGON((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0)),MULTIPOLYGON(((-1 -1,-1 2.5,2 2,2 -1,-1 -1),(0 0,0 1,1 1,1 0,0 0),(-0.5 -0.5,-0.5 -0.4,-0.4 -0.4,-0.4 -0.5,-0.5 -0.5))))",
 	};
 
-
-	for ( i = 0; i < (sizeof ewkt/sizeof(char *)); i++ )
+	for (i = 0; i < (sizeof ewkt / sizeof(char *)); i++)
 	{
-		LWGEOM *geom_in, *geom_out;
-		char *in_ewkt;
-		char *out_ewkt;
-
 		in_ewkt = ewkt[i];
 		geom_in = lwgeom_from_wkt(in_ewkt, LW_PARSER_CHECK_NONE);
 		geom_out = lwgeom_geos_noop(geom_in);
-		if ( ! geom_out ) {
-			// fprintf(stderr, "\nNull return from lwgeom_geos_noop with wkt:   %s\n", in_ewkt);
-			lwgeom_free(geom_in);
-			continue;
-		}
+		CU_ASSERT_PTR_NOT_NULL_FATAL(geom_out);
 		out_ewkt = lwgeom_to_ewkt(geom_out);
-		if (strcmp(in_ewkt, out_ewkt))
-			fprintf(stderr, "\nExp:   %s\nObt:  %s\n", in_ewkt, out_ewkt);
-		CU_ASSERT_STRING_EQUAL(in_ewkt, out_ewkt);
+		ASSERT_STRING_EQUAL(out_ewkt, in_ewkt);
 		lwfree(out_ewkt);
 		lwgeom_free(geom_out);
 		lwgeom_free(geom_in);
 	}
+
+	/* TINs become collections of Polygons */
+	in_ewkt = "TIN(((0 0, 1 1, 2 2, 0 0)), ((0 0, 1 1, 2 2, 0 0)))";
+	geom_in = lwgeom_from_wkt(in_ewkt, LW_PARSER_CHECK_NONE);
+	geom_out = lwgeom_geos_noop(geom_in);
+	out_ewkt = lwgeom_to_ewkt(geom_out);
+	ASSERT_STRING_EQUAL(out_ewkt, "GEOMETRYCOLLECTION(POLYGON((0 0,1 1,2 2,0 0)),POLYGON((0 0,1 1,2 2,0 0)))");
+	lwfree(out_ewkt);
+	lwgeom_free(geom_in);
+	lwgeom_free(geom_out);
+
+	/* Empties disappear */
+	in_ewkt = "GEOMETRYCOLLECTION( LINESTRING (1 1, 2 2), POINT EMPTY, TRIANGLE ((0 0, 1 0, 1 1, 0 0)) )";
+	geom_in = lwgeom_from_wkt(in_ewkt, LW_PARSER_CHECK_NONE);
+	geom_out = lwgeom_geos_noop(geom_in);
+	out_ewkt = lwgeom_to_ewkt(geom_out);
+	ASSERT_STRING_EQUAL(out_ewkt, "GEOMETRYCOLLECTION(LINESTRING(1 1,2 2),POLYGON((0 0,1 0,1 1,0 0)))");
+	lwfree(out_ewkt);
+	lwgeom_free(geom_in);
+	lwgeom_free(geom_out);
 }
 
 static void test_geos_linemerge(void)
@@ -135,7 +147,9 @@ test_geos_makevalid(void)
 	geom1 = lwgeom_from_wkb(wkb, 157, LW_PARSER_CHECK_NONE);
 	geom2 = lwgeom_make_valid(geom1);
 	out_ewkt = lwgeom_to_ewkt((LWGEOM*)geom2);
-	ASSERT_STRING_EQUAL(out_ewkt, "GEOMETRYCOLLECTION(POLYGON((92114.014 463463.469,92115.5120743 463462.206937,92115.512 463462.207,92127.546 463452.075,92117.173 463439.755,92133.675 463425.942,92122.136 463412.826,92092.377 463437.77,92114.014 463463.469)),MULTIPOINT(92115.5120743 463462.206937,92122.136 463412.826))");
+	ASSERT_STRING_EQUAL(
+	    out_ewkt,
+	    "GEOMETRYCOLLECTION(POLYGON((92114.014 463463.469,92115.5120743171 463462.206937429,92115.512 463462.207,92127.546 463452.075,92117.173 463439.755,92133.675 463425.942,92122.136 463412.826,92092.377 463437.77,92114.014 463463.469)),MULTIPOINT(92115.5120743171 463462.206937429,92122.136 463412.826))");
 	lwfree(out_ewkt);
 	lwgeom_free(geom1);
 	lwgeom_free(geom2);

@@ -18,29 +18,6 @@
 #include "cu_tester.h"
 
 
-static void test_misc_force_2d(void)
-{
-	LWGEOM *geom;
-	LWGEOM *geom2d;
-	char *wkt_out;
-
-	geom = lwgeom_from_wkt("CIRCULARSTRINGM(-5 0 4,0 5 3,5 0 2,10 -5 1,15 0 0)", LW_PARSER_CHECK_NONE);
-	geom2d = lwgeom_force_2d(geom);
-	wkt_out = lwgeom_to_ewkt(geom2d);
-	CU_ASSERT_STRING_EQUAL("CIRCULARSTRING(-5 0,0 5,5 0,10 -5,15 0)",wkt_out);
-	lwgeom_free(geom);
-	lwgeom_free(geom2d);
-	lwfree(wkt_out);
-
-	geom = lwgeom_from_wkt("GEOMETRYCOLLECTION(POINT(0 0 0),LINESTRING(1 1 1,2 2 2),POLYGON((0 0 1,0 1 1,1 1 1,1 0 1,0 0 1)),CURVEPOLYGON(CIRCULARSTRING(0 0 0,1 1 1,2 2 2,1 1 1,0 0 0)))", LW_PARSER_CHECK_NONE);
-	geom2d = lwgeom_force_2d(geom);
-	wkt_out = lwgeom_to_ewkt(geom2d);
-	CU_ASSERT_STRING_EQUAL("GEOMETRYCOLLECTION(POINT(0 0),LINESTRING(1 1,2 2),POLYGON((0 0,0 1,1 1,1 0,0 0)),CURVEPOLYGON(CIRCULARSTRING(0 0,1 1,2 2,1 1,0 0)))",wkt_out);
-	lwgeom_free(geom);
-	lwgeom_free(geom2d);
-	lwfree(wkt_out);
-}
-
 static void test_misc_simplify(void)
 {
 	LWGEOM *geom;
@@ -59,6 +36,14 @@ static void test_misc_simplify(void)
 	geom2d = lwgeom_simplify(geom, 2, LW_FALSE);
 	wkt_out = lwgeom_to_ewkt(geom2d);
 	CU_ASSERT_STRING_EQUAL("MULTILINESTRING((0 0,0 51,50 20,30 20,7 32))",wkt_out);
+	lwgeom_free(geom);
+	lwgeom_free(geom2d);
+	lwfree(wkt_out);
+
+	geom = lwgeom_from_wkt("POLYGON((0 0,1 1,1 3,0 4,-2 3,-1 1,0 0))", LW_PARSER_CHECK_NONE);
+	geom2d = lwgeom_simplify(geom, 1, LW_FALSE);
+	wkt_out = lwgeom_to_ewkt(geom2d);
+	CU_ASSERT_STRING_EQUAL("POLYGON((0 0,0 4,-2 3,0 0))", wkt_out);
 	lwgeom_free(geom);
 	lwgeom_free(geom2d);
 	lwfree(wkt_out);
@@ -234,6 +219,22 @@ static void test_lwmpoint_from_lwgeom(void)
 	do_fn_test(to_points, "TIN(((80 130,50 160,80 70,80 130)),((50 160,10 190,10 70,50 160)))", "MULTIPOINT (80 130, 50 160, 80 70, 80 130, 50 160, 10 190, 10 70, 50 160)");
 }
 
+static void test_gbox_serialized_size(void)
+{
+	lwflags_t flags = lwflags(0, 0, 0);
+	CU_ASSERT_EQUAL(gbox_serialized_size(flags),16);
+	FLAGS_SET_BBOX(flags, 1);
+	CU_ASSERT_EQUAL(gbox_serialized_size(flags),16);
+	FLAGS_SET_Z(flags, 1);
+	CU_ASSERT_EQUAL(gbox_serialized_size(flags),24);
+	FLAGS_SET_M(flags, 1);
+	CU_ASSERT_EQUAL(gbox_serialized_size(flags),32);
+	FLAGS_SET_GEODETIC(flags, 1);
+	CU_ASSERT_EQUAL(gbox_serialized_size(flags),24);
+}
+
+
+
 /*
 ** Used by the test harness to register the tests in this file.
 */
@@ -241,7 +242,6 @@ void misc_suite_setup(void);
 void misc_suite_setup(void)
 {
 	CU_pSuite suite = CU_add_suite("miscellaneous", NULL, NULL);
-	PG_ADD_TEST(suite, test_misc_force_2d);
 	PG_ADD_TEST(suite, test_misc_simplify);
 	PG_ADD_TEST(suite, test_misc_count_vertices);
 	PG_ADD_TEST(suite, test_misc_area);
@@ -250,4 +250,5 @@ void misc_suite_setup(void)
 	PG_ADD_TEST(suite, test_grid_in_place);
 	PG_ADD_TEST(suite, test_clone);
 	PG_ADD_TEST(suite, test_lwmpoint_from_lwgeom);
+	PG_ADD_TEST(suite, test_gbox_serialized_size);
 }
