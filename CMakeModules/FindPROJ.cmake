@@ -12,7 +12,7 @@
 # Find include path
 find_path( PROJ_INCLUDE_DIR
   NAMES
-    proj_api.h
+    proj.h
   HINTS
     ${PROJ_DIR}/include
   PATHS
@@ -25,19 +25,22 @@ find_path( PROJ_INCLUDE_DIR
 
 # Set PROJ_VERSION
 if( PROJ_INCLUDE_DIR )
-  set( _versionFile "${PROJ_INCLUDE_DIR}/proj_api.h" )
+  set( _versionFile "${PROJ_INCLUDE_DIR}/proj.h" )
   if( NOT EXISTS ${_versionFile} )
     message( SEND_ERROR "Can't find ${_versionFile}" )
   else()
     file( READ "${_versionFile}" _versionContents )
 
-    string( REGEX MATCH "PJ_VERSION ([0-9])([0-9])([0-9])" _ ${_versionContents} )
+    string( REGEX MATCH "PROJ_VERSION_MAJOR ([0-9]*)" _ ${_versionContents} )
     set( PROJ_VERSION_MAJOR ${CMAKE_MATCH_1} )
-    set( PROJ_VERSION_MINOR ${CMAKE_MATCH_2} )
-    set( PROJ_VERSION_MICRO ${CMAKE_MATCH_3} )
 
-    set( PROJ_VERSION
-      "${PROJ_VERSION_MAJOR}.${PROJ_VERSION_MINOR}.${PROJ_VERSION_MICRO}" )
+    string( REGEX MATCH "PROJ_VERSION_MINOR ([0-9]*)" _ ${_versionContents} )
+    set( PROJ_VERSION_MINOR ${CMAKE_MATCH_1} )
+
+    string( REGEX MATCH "PROJ_VERSION_PATCH ([0-9]*)" _ ${_versionContents} )
+    set( PROJ_VERSION_MICRO ${CMAKE_MATCH_1} )
+
+    set( PROJ_VERSION "${PROJ_VERSION_MAJOR}.${PROJ_VERSION_MINOR}.${PROJ_VERSION_MICRO}" )
   endif()
 endif()
 
